@@ -41,7 +41,7 @@
 | **Embedding模型** | paraphrase-multilingual-MiniLM-L12-v2 | paraphrase-multilingual-mpnet-base-v2 ❌ | paraphrase-multilingual-MiniLM-L12-v2 ✅ |
 
 **代码位置**:
-- **ai-service**: `/Users/mengwei/ww/github/synapsetest-qwen/ai-service/data/qdrant_client.py`
+- **ai-service**: `/Users/mengwei/ww/github/synapsetest/ai-service/data/qdrant_client.py`
   - 第58行: `EMBEDDING_DIM = 384`
   - 第108-110行: `SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')`
 
@@ -62,7 +62,7 @@
 | **初始化脚本** | `QdrantClient(path=str(QDRANT_STORAGE_PATH))` | 保持不变 ✅ | ✅ 持久化到磁盘 |
 
 **代码位置**:
-- **ai-service**: `/Users/mengwei/ww/github/synapsetest-qwen/ai-service/data/qdrant_client.py` 第74-80行
+- **ai-service**: `/Users/mengwei/ww/github/synapsetest/ai-service/data/qdrant_client.py` 第74-80行
 
 **修正后代码** (已完成 ✅):
 ```python
@@ -87,7 +87,7 @@ if ai_config.QDRANT_MODE == 'memory':
 
 ### 1. init_vector_db_qdrant.py 修正
 
-**修改文件**: `/Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts/init_vector_db_qdrant.py`
+**修改文件**: `/Users/mengwei/ww/github/synapsetest/ai-service/scripts/init_vector_db_qdrant.py`
 
 **修改内容**:
 ```python
@@ -111,7 +111,7 @@ EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"  # 与ai-service保持
 
 ### 2. README.md 更新
 
-**修改文件**: `/Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts/README.md`
+**修改文件**: `/Users/mengwei/ww/github/synapsetest/ai-service/scripts/README.md`
 
 **新增内容**:
 
@@ -148,7 +148,7 @@ EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"  # 与ai-service保持
 运行验证脚本确认所有配置正确:
 
 ```bash
-cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts
+cd /Users/mengwei/ww/github/synapsetest/ai-service/scripts
 python verify_qdrant_config.py
 ```
 
@@ -160,10 +160,10 @@ python verify_qdrant_config.py
 
 ```bash
 # 1. (可选) 如果之前运行过旧版脚本,删除旧数据
-rm -rf /Users/mengwei/ww/github/synapsetest-qwen/ai-service/data/qdrant_storage/
+rm -rf /Users/mengwei/ww/github/synapsetest/ai-service/data/qdrant_storage/
 
 # 2. 运行初始化脚本
-cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts
+cd /Users/mengwei/ww/github/synapsetest/ai-service/scripts
 python init_vector_db_qdrant.py
 
 # 3. 运行MySQL初始化 (如果还没运行)
@@ -175,7 +175,7 @@ mysql -u root -psynapsetest123 < init_mysql.sql
 ### 启动ai-service
 
 ```bash
-cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service
+cd /Users/mengwei/ww/github/synapsetest/ai-service
 python main.py
 ```
 
@@ -200,7 +200,7 @@ ai-service代码已更新,持久化已自动启用。
 
 ```bash
 grep -n "COLLECTION_NAME\|EMBEDDING_DIM\|EMBEDDING_MODEL" \
-  /Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts/init_vector_db_qdrant.py
+  /Users/mengwei/ww/github/synapsetest/ai-service/scripts/init_vector_db_qdrant.py
 ```
 
 **预期输出**:
@@ -215,7 +215,7 @@ grep -n "COLLECTION_NAME\|EMBEDDING_DIM\|EMBEDDING_MODEL" \
 ### 验证2: 运行初始化脚本
 
 ```bash
-cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts
+cd /Users/mengwei/ww/github/synapsetest/ai-service/scripts
 python init_vector_db_qdrant.py
 ```
 
@@ -241,7 +241,7 @@ python init_vector_db_qdrant.py
 from qdrant_client import QdrantClient
 from pathlib import Path
 
-storage_path = Path("/Users/mengwei/ww/github/synapsetest-qwen/ai-service/data/qdrant_storage")
+storage_path = Path("/Users/mengwei/ww/github/synapsetest/ai-service/data/qdrant_storage")
 client = QdrantClient(path=str(storage_path))
 
 # 检查collection

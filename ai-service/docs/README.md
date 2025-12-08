@@ -350,8 +350,8 @@ mysqldump -u root -p synapsetest > backup.sql
 
 ## 📮 联系方式
 
-- 项目地址: https://github.com/your-repo/synapsetest-qwen
-- Issue 追踪: https://github.com/your-repo/synapsetest-qwen/issues
+- 项目地址: https://github.com/your-repo/synapsetest
+- Issue 追踪: https://github.com/your-repo/synapsetest/issues
 
 ---
 

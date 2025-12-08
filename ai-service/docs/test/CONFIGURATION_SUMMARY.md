@@ -149,7 +149,7 @@ PASSED [100%]
 ## 📚 文档结构
 
 ```
-synapsetest-qwen/
+synapsetest/
 ├── .vscode/
 │   ├── settings.json          # IDE 设置
 │   ├── launch.json            # 调试配置

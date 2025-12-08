@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2025-11-10
-**Feature**: [/Users/mengwei/ww/github/synapsetest-qwen/specs/001-ai-testing-platform/spec.md](file:///Users/mengwei/ww/github/synapsetest-qwen/specs/001-ai-testing-platform/spec.md)
+**Feature**: [/Users/mengwei/ww/github/synapsetest/specs/001-ai-testing-platform/spec.md](file:///Users/mengwei/ww/github/synapsetest/specs/001-ai-testing-platform/spec.md)
 
 ## Content Quality
 

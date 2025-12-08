@@ -101,7 +101,7 @@ python verify_qdrant_config.py
 ### 第1步: 验证配置 (推荐)
 
 ```bash
-cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts
+cd /Users/mengwei/ww/github/synapsetest/ai-service/scripts
 python verify_qdrant_config.py
 ```
 
@@ -114,7 +114,7 @@ python verify_qdrant_config.py
 #### 初始化MySQL
 
 ```bash
-cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts
+cd /Users/mengwei/ww/github/synapsetest/ai-service/scripts
 mysql -u root -psynapsetest123 < init_mysql.sql
 ```
 
@@ -125,7 +125,7 @@ mysql -u root -psynapsetest123 < init_mysql.sql
 #### 初始化Qdrant向量数据库
 
 ```bash
-cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service/scripts
+cd /Users/mengwei/ww/github/synapsetest/ai-service/scripts
 python init_vector_db_qdrant.py
 ```
 
@@ -153,7 +153,7 @@ python init_vector_db_qdrant.py
 ### 第3步: 启动ai-service
 
 ```bash
-cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service
+cd /Users/mengwei/ww/github/synapsetest/ai-service
 python main.py
 ```
 

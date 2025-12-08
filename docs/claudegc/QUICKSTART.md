@@ -178,7 +178,7 @@ tail -f backend/logs/application.log
 ```bash
 # 1. 克隆项目
 git clone <repo-url>
-cd synapsetest-qwen
+cd synapsetest
 
 # 2. 启动数据库
 ./start_mysql.sh
