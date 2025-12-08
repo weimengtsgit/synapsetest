@@ -1,0 +1,18 @@
+[flake8]
+max-line-length = 120
+exclude = .git,__pycache__,venv,.venv,build,dist
+ignore = E203,E266,W503
+
+[pylint]
+max-line-length = 120
+disable = C0111,C0103
+
+[mypy]
+python_version = 3.9
+warn_return_any = True
+warn_unused_configs = True
+disallow_untyped_defs = False
+
+[isort]
+profile = black
+line_length = 120

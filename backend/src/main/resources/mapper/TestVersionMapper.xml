@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.synapsetest.testmanagement.mapper.TestVersionMapper">
+
+    <!-- Result Map for TestVersion -->
+    <resultMap id="TestVersionResultMap" type="com.synapsetest.testmanagement.model.TestVersion">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="productVersion" column="product_version"/>
+        <result property="releaseDate" column="release_date"/>
+        <result property="config" column="config" typeHandler="com.synapsetest.testmanagement.config.JsonMapTypeHandler"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- Select by ID -->
+    <select id="selectById" resultMap="TestVersionResultMap">
+        SELECT * FROM test_versions WHERE id = #{id}
+    </select>
+
+    <!-- Select All -->
+    <select id="selectAll" resultMap="TestVersionResultMap">
+        SELECT * FROM test_versions
+    </select>
+
+    <!-- Select by Name -->
+    <select id="selectByName" resultMap="TestVersionResultMap">
+        SELECT * FROM test_versions WHERE name = #{name}
+    </select>
+
+    <!-- Select by Product Version -->
+    <select id="selectByProductVersion" resultMap="TestVersionResultMap">
+        SELECT * FROM test_versions WHERE product_version = #{productVersion}
+    </select>
+
+    <!-- Select by Product Version and Name -->
+    <select id="selectByProductVersionAndName" resultMap="TestVersionResultMap">
+        SELECT * FROM test_versions 
+        WHERE product_version = #{productVersion} AND name = #{name}
+    </select>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="com.synapsetest.testmanagement.model.TestVersion">
+        INSERT INTO test_versions(
+            id, name, product_version, description, release_date,
+            config, created_at, updated_at
+        ) VALUES (
+            #{id},
+            #{name},
+            #{productVersion},
+            #{description},
+            #{releaseDate},
+            #{config, typeHandler=com.synapsetest.testmanagement.config.JsonMapTypeHandler},
+            #{createdAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <!-- Update -->
+    <update id="update" parameterType="com.synapsetest.testmanagement.model.TestVersion">
+        UPDATE test_versions SET
+            name = #{name},
+            product_version = #{productVersion},
+            description = #{description},
+            release_date = #{releaseDate},
+            config = #{config, typeHandler=com.synapsetest.testmanagement.config.JsonMapTypeHandler},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Delete by ID -->
+    <delete id="deleteById">
+        DELETE FROM test_versions WHERE id = #{id}
+    </delete>
+
+    <!-- Count -->
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM test_versions
+    </select>
+
+</mapper>
+

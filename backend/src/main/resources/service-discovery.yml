@@ -1,0 +1,15 @@
+# Service Discovery Configuration (Simplified for MVP)
+# In production, use Nacos or Eureka
+# For MVP, using direct service URLs
+
+spring:
+  cloud:
+    discovery:
+      enabled: false
+
+# Service URLs for direct communication
+services:
+  ai-service:
+    url: ${AI_SERVICE_URL:http://localhost:8000}
+  backend:
+    url: ${BACKEND_SERVICE_URL:http://localhost:8080}
