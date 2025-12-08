@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.synapsetest.testmanagement.mapper.QualityReportMapper">
+
+    <!-- Result Map for QualityReport -->
+    <resultMap id="QualityReportResultMap" type="com.synapsetest.testmanagement.model.QualityReport">
+        <id property="id" column="id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="name" column="name"/>
+        <result property="summary" column="summary"/>
+        <result property="generatedAt" column="generated_at"/>
+        <result property="status" column="status"/>
+        <result property="defectStats" column="defect_stats" typeHandler="com.synapsetest.testmanagement.config.JsonMapTypeHandler"/>
+        <result property="performanceMetrics" column="performance_metrics" typeHandler="com.synapsetest.testmanagement.config.JsonMapTypeHandler"/>
+        
+        <!-- 嵌套结果：风险评估 -->
+        <association property="riskAssessment" javaType="com.synapsetest.testmanagement.model.RiskAssessment" 
+                    select="selectRiskAssessmentByReportId" column="id"/>
+        
+        <!-- 嵌套结果：测试结果列表 -->
+        <collection property="testResults" ofType="com.synapsetest.testmanagement.model.TestResult" 
+                   select="selectTestResultsByReportId" column="id"/>
+    </resultMap>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="com.synapsetest.testmanagement.model.QualityReport">
+        INSERT INTO quality_report (
+            id, task_id, name, summary, generated_at, status,
+            defect_stats, performance_metrics
+        ) VALUES (
+            #{id}, #{taskId}, #{name}, #{summary}, #{generatedAt}, #{status},
+            #{defectStats, typeHandler=com.synapsetest.testmanagement.config.JsonMapTypeHandler},
+            #{performanceMetrics, typeHandler=com.synapsetest.testmanagement.config.JsonMapTypeHandler}
+        )
+    </insert>
+
+    <!-- Select by ID -->
+    <select id="selectById" resultMap="QualityReportResultMap">
+        SELECT * FROM quality_report WHERE id = #{id}
+    </select>
+
+    <!-- Select by Task ID -->
+    <select id="selectByTaskId" resultMap="QualityReportResultMap">
+        SELECT * FROM quality_report WHERE task_id = #{taskId} ORDER BY generated_at DESC
+    </select>
+
+    <!-- Select by Status -->
+    <select id="selectByStatus" resultMap="QualityReportResultMap">
+        SELECT * FROM quality_report WHERE status = #{status} ORDER BY generated_at DESC
+    </select>
+
+    <!-- Select by Generated Time Range -->
+    <select id="selectByGeneratedTimeRange" resultMap="QualityReportResultMap">
+        SELECT * FROM quality_report
+        WHERE generated_at BETWEEN #{startTime} AND #{endTime}
+        ORDER BY generated_at DESC
+    </select>
+
+    <!-- Select Latest 10 -->
+    <select id="selectLatest10" resultMap="QualityReportResultMap">
+        SELECT * FROM quality_report ORDER BY generated_at DESC LIMIT 10
+    </select>
+
+    <!-- Update -->
+    <update id="update" parameterType="com.synapsetest.testmanagement.model.QualityReport">
+        UPDATE quality_report SET
+            task_id = #{taskId},
+            name = #{name},
+            summary = #{summary},
+            generated_at = #{generatedAt},
+            status = #{status},
+            defect_stats = #{defectStats, typeHandler=com.synapsetest.testmanagement.config.JsonMapTypeHandler},
+            performance_metrics = #{performanceMetrics, typeHandler=com.synapsetest.testmanagement.config.JsonMapTypeHandler}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Update Status -->
+    <update id="updateStatus">
+        UPDATE quality_report SET status = #{status} WHERE id = #{id}
+    </update>
+
+    <!-- Update Summary -->
+    <update id="updateSummary">
+        UPDATE quality_report SET summary = #{summary} WHERE id = #{id}
+    </update>
+
+    <!-- Delete by ID -->
+    <delete id="deleteById">
+        DELETE FROM quality_report WHERE id = #{id}
+    </delete>
+    
+    <select id="findById" resultMap="QualityReportResultMap">
+        SELECT * FROM quality_report WHERE id = #{id}
+    </select>
+    
+    <delete id="deleteAll">
+        DELETE FROM quality_report
+    </delete>
+
+    <!-- Delete by Task ID -->
+    <delete id="deleteByTaskId">
+        DELETE FROM quality_report WHERE task_id = #{taskId}
+    </delete>
+
+    <!-- Delete by IDs -->
+    <delete id="deleteByIds">
+        DELETE FROM quality_report WHERE id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 查询测试结果 -->
+    <select id="selectTestResultsByReportId" resultType="com.synapsetest.testmanagement.model.TestResult">
+        SELECT 
+            id, report_id, test_case_id, test_case_name, status,
+            execution_time, error, screenshot, executed_at
+        FROM quality_report_test_result 
+        WHERE report_id = #{reportId}
+        ORDER BY executed_at DESC
+    </select>
+
+    <!-- 查询风险评估 -->
+    <resultMap id="RiskAssessmentResultMap" type="com.synapsetest.testmanagement.model.RiskAssessment">
+        <result property="reportId" column="report_id"/>
+        <result property="overallRisk" column="overall_risk"/>
+        <result property="riskScore" column="risk_score"/>
+        <result property="highRiskModules" column="high_risk_modules" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+        <result property="recommendations" column="recommendations" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+        <result property="moduleRiskScores" column="module_risk_scores" typeHandler="com.synapsetest.testmanagement.config.JsonMapTypeHandler"/>
+    </resultMap>
+
+    <select id="selectRiskAssessmentByReportId" resultMap="RiskAssessmentResultMap">
+        SELECT
+            report_id, overall_risk, risk_score,
+            high_risk_modules, recommendations, module_risk_scores
+        FROM quality_report_risk_assessment
+        WHERE report_id = #{reportId}
+    </select>
+</mapper>

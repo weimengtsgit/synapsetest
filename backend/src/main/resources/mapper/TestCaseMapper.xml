@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.synapsetest.testmanagement.mapper.TestCaseMapper">
+
+    <!-- Result Map for TestCase -->
+    <resultMap id="TestCaseResultMap" type="com.synapsetest.testmanagement.model.TestCase">
+        <id property="id" column="id"/>
+        <result property="title" column="title"/>
+        <result property="description" column="description"/>
+        <result property="steps" column="steps" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+        <result property="expectedResult" column="expected_result"/>
+        <result property="priority" column="priority"/>
+        <result property="type" column="type"/>
+        <result property="status" column="status"/>
+        <result property="tags" column="tags" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+        <result property="relatedRequirement" column="related_requirement"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+    </resultMap>
+
+    <!-- Select by ID -->
+    <select id="selectById" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases WHERE id = #{id}
+    </select>
+
+    <!-- Select All -->
+    <select id="selectAll" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases
+    </select>
+
+    <!-- Select by Type -->
+    <select id="selectByType" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases WHERE type = #{type}
+    </select>
+
+    <!-- Select by Status -->
+    <select id="selectByStatus" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases WHERE status = #{status}
+    </select>
+
+    <!-- Select by Related Requirement -->
+    <select id="selectByRelatedRequirement" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases WHERE related_requirement = #{relatedRequirement}
+    </select>
+
+    <!-- Select by Created By -->
+    <select id="selectByCreatedBy" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases WHERE created_by = #{createdBy}
+    </select>
+
+    <!-- Select by Status Order by Priority Desc -->
+    <select id="selectByStatusOrderByPriorityDesc" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases WHERE status = #{status} ORDER BY priority DESC
+    </select>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="com.synapsetest.testmanagement.model.TestCase">
+        INSERT INTO test_cases(
+            id, title, description, type, status, priority, expected_result,
+            related_requirement, steps, tags, created_at, updated_at, created_by
+        ) VALUES (
+            #{id},
+            #{title},
+            #{description},
+            #{type},
+            #{status},
+            #{priority},
+            #{expectedResult},
+            #{relatedRequirement},
+            #{steps, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            #{tags, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            #{createdAt},
+            #{updatedAt},
+            #{createdBy}
+        )
+    </insert>
+
+    <!-- Update -->
+    <update id="update" parameterType="com.synapsetest.testmanagement.model.TestCase">
+        UPDATE test_cases SET
+            title = #{title},
+            description = #{description},
+            type = #{type},
+            status = #{status},
+            priority = #{priority},
+            expected_result = #{expectedResult},
+            related_requirement = #{relatedRequirement},
+            steps = #{steps, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            tags = #{tags, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Delete by ID -->
+    <delete id="deleteById">
+        DELETE FROM test_cases WHERE id = #{id}
+    </delete>
+
+    <!-- Count -->
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM test_cases
+    </select>
+
+</mapper>
+

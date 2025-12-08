@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.synapsetest.testmanagement.mapper.RiskAssessmentMapper">
+
+    <!-- Result Map for RiskAssessment -->
+    <resultMap id="RiskAssessmentResultMap" type="com.synapsetest.testmanagement.model.RiskAssessment">
+        <result property="reportId" column="report_id"/>
+        <result property="overallRisk" column="overall_risk"/>
+        <result property="riskScore" column="risk_score"/>
+        <result property="highRiskModules" column="high_risk_modules" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+        <result property="recommendations" column="recommendations" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+        <result property="moduleRiskScores" column="module_risk_scores" typeHandler="com.synapsetest.testmanagement.config.JsonMapTypeHandler"/>
+    </resultMap>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="com.synapsetest.testmanagement.model.RiskAssessment">
+        INSERT INTO quality_report_risk_assessment (
+            report_id, overall_risk, risk_score,
+            high_risk_modules, recommendations, module_risk_scores
+        ) VALUES (
+            #{reportId}, #{overallRisk}, #{riskScore},
+            #{highRiskModules, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            #{recommendations, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            #{moduleRiskScores, typeHandler=com.synapsetest.testmanagement.config.JsonMapTypeHandler}
+        )
+    </insert>
+
+    <!-- Select by Report ID -->
+    <select id="selectByReportId" resultMap="RiskAssessmentResultMap">
+        SELECT * FROM quality_report_risk_assessment
+        WHERE report_id = #{reportId}
+    </select>
+
+    <!-- Update -->
+    <update id="update" parameterType="com.synapsetest.testmanagement.model.RiskAssessment">
+        UPDATE quality_report_risk_assessment SET
+            overall_risk = #{overallRisk},
+            risk_score = #{riskScore},
+            high_risk_modules = #{highRiskModules, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            recommendations = #{recommendations, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            module_risk_scores = #{moduleRiskScores, typeHandler=com.synapsetest.testmanagement.config.JsonMapTypeHandler}
+        WHERE report_id = #{reportId}
+    </update>
+
+    <!-- Delete by Report ID -->
+    <delete id="deleteByReportId">
+        DELETE FROM quality_report_risk_assessment WHERE report_id = #{reportId}
+    </delete>
+
+    <!-- Delete by Report IDs -->
+    <delete id="deleteByReportIds">
+        DELETE FROM quality_report_risk_assessment WHERE report_id IN
+        <foreach item="reportId" collection="reportIds" open="(" separator="," close=")">
+            #{reportId}
+        </foreach>
+    </delete>
+</mapper>

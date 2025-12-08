@@ -1,0 +1,20 @@
+# Distributed Configuration (Simplified for MVP)
+# In production, use Apollo or Nacos Config
+# For MVP, using Spring Boot's external configuration
+
+# Application Name
+application:
+  name: test-management-system
+  version: 1.0.0
+
+# Feature Flags
+features:
+  ai-recommendations: true
+  advanced-analytics: false
+  distributed-tracing: false
+
+# External Service URLs (can be overridden by environment variables)
+external:
+  services:
+    jira-url: ${JIRA_URL:http://jira.example.com}
+    gitlab-url: ${GITLAB_URL:http://gitlab.example.com}

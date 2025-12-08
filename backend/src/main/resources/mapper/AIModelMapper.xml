@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.synapsetest.testmanagement.mapper.AIModelMapper">
+
+    <!-- Result Map for AIModel -->
+    <resultMap id="AIModelResultMap" type="com.synapsetest.testmanagement.model.AIModel">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="version" column="version"/>
+        <result property="description" column="description"/>
+        <result property="filePath" column="file_path"/>
+        <result property="securityStatus" column="security_status"/>
+        <result property="vulnerabilityScanResult" column="vulnerability_scan_result"/>
+        <result property="lastScanTime" column="last_scan_time"/>
+        <result property="complianceStatus" column="compliance_status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="metrics" column="metrics" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+    </resultMap>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="com.synapsetest.testmanagement.model.AIModel">
+        INSERT INTO ai_model (
+            id, name, version, description, file_path, 
+            security_status, vulnerability_scan_result, last_scan_time,
+            compliance_status, created_at, updated_at, metrics
+        ) VALUES (
+            #{id}, #{name}, #{version}, #{description}, #{filePath}, 
+            #{securityStatus}, #{vulnerabilityScanResult}, #{lastScanTime},
+            #{complianceStatus}, #{createdAt}, #{updatedAt},
+            #{metrics, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler}
+        )
+    </insert>
+
+    <!-- Select by ID -->
+    <select id="selectById" resultMap="AIModelResultMap">
+        SELECT * FROM ai_model WHERE id = #{id}
+    </select>
+
+    <!-- Select by Name and Version -->
+    <select id="selectByNameAndVersion" resultMap="AIModelResultMap">
+        SELECT * FROM ai_model WHERE name = #{name} AND version = #{version}
+    </select>
+
+    <!-- Select by Name -->
+    <select id="selectByName" resultMap="AIModelResultMap">
+        SELECT * FROM ai_model WHERE name = #{name} ORDER BY version DESC
+    </select>
+
+    <!-- Select by Security Status -->
+    <select id="selectBySecurityStatus" resultMap="AIModelResultMap">
+        SELECT * FROM ai_model WHERE security_status = #{securityStatus} ORDER BY updated_at DESC
+    </select>
+
+    <!-- Select by Compliance Status -->
+    <select id="selectByComplianceStatus" resultMap="AIModelResultMap">
+        SELECT * FROM ai_model WHERE compliance_status = #{complianceStatus} ORDER BY updated_at DESC
+    </select>
+
+    <!-- Select All -->
+    <select id="selectAll" resultMap="AIModelResultMap">
+        SELECT * FROM ai_model ORDER BY updated_at DESC
+    </select>
+
+    <!-- Select by Created Time Range -->
+    <select id="selectByCreatedTimeRange" resultMap="AIModelResultMap">
+        SELECT * FROM ai_model 
+        WHERE created_at BETWEEN #{startTime} AND #{endTime} 
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- Update -->
+    <update id="update" parameterType="com.synapsetest.testmanagement.model.AIModel">
+        UPDATE ai_model SET 
+            name = #{name},
+            version = #{version},
+            description = #{description},
+            file_path = #{filePath},
+            security_status = #{securityStatus},
+            vulnerability_scan_result = #{vulnerabilityScanResult},
+            last_scan_time = #{lastScanTime},
+            compliance_status = #{complianceStatus},
+            updated_at = #{updatedAt},
+            metrics = #{metrics, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Update Security Status -->
+    <update id="updateSecurityStatus">
+        UPDATE ai_model SET 
+            security_status = #{securityStatus},
+            last_scan_time = #{lastScanTime}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Update Compliance Status -->
+    <update id="updateComplianceStatus">
+        UPDATE ai_model SET compliance_status = #{complianceStatus} WHERE id = #{id}
+    </update>
+
+    <!-- Delete by ID -->
+    <delete id="deleteById">
+        DELETE FROM ai_model WHERE id = #{id}
+    </delete>
+
+    <!-- Delete by IDs -->
+    <delete id="deleteByIds">
+        DELETE FROM ai_model WHERE id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- Count by Name and Version -->
+    <select id="countByNameAndVersion" resultType="int">
+        SELECT COUNT(*) FROM ai_model 
+        WHERE name = #{name} AND version = #{version}
+        <if test="excludeId != null">
+            AND id != #{excludeId}
+        </if>
+    </select>
+</mapper>
