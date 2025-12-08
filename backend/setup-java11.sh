@@ -20,7 +20,7 @@ java -version
 
 echo ""
 echo "环境已设置！现在可以运行："
-echo "  cd /Users/mengwei/ww/github/synapsetest-qwen/backend"
+echo "  cd /Users/mengwei/ww/github/synapsetest/backend"
 echo "  mvn clean compile"
 echo "  mvn spring-boot:run"
 

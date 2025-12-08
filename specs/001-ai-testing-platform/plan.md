@@ -1,6 +1,6 @@
 # Implementation Plan: AI驱动测试任务管理系统
 
-**Branch**: `001-ai-testing-platform` | **Date**: 2025-11-10 | **Spec**: [/Users/mengwei/ww/github/synapsetest-qwen/specs/001-ai-testing-platform/spec.md](file:///Users/mengwei/ww/github/synapsetest-qwen/specs/001-ai-testing-platform/spec.md)
+**Branch**: `001-ai-testing-platform` | **Date**: 2025-11-10 | **Spec**: [/Users/mengwei/ww/github/synapsetest/specs/001-ai-testing-platform/spec.md](file:///Users/mengwei/ww/github/synapsetest/specs/001-ai-testing-platform/spec.md)
 **Input**: Feature specification from `/specs/001-ai-testing-platform/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.

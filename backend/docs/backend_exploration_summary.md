@@ -50,7 +50,7 @@
 
 ### Base Directory
 ```
-/Users/mengwei/ww/github/synapsetest-qwen/backend/
+/Users/mengwei/ww/github/synapsetest/backend/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/synapsetest/testmanagement/

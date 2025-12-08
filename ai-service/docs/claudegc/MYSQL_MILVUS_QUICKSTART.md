@@ -13,8 +13,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-repo/synapsetest-qwen.git
-cd synapsetest-qwen
+git clone https://github.com/your-repo/synapsetest.git
+cd synapsetest
 
 # 启动所有服务
 docker-compose -f docker-compose.mysql-milvus.yml up -d

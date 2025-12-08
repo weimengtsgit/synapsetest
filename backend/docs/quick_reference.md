@@ -5,7 +5,7 @@
 - **Language:** Java 11
 - **Build Tool:** Maven
 - **ORM:** MyBatis 2.3.1 (replaced JPA/Hibernate)
-- **Project Root:** `/Users/mengwei/ww/github/synapsetest-qwen/backend`
+- **Project Root:** `/Users/mengwei/ww/github/synapsetest/backend`
 
 ## Database Connections
 ```

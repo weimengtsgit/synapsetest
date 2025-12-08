@@ -49,8 +49,8 @@ docker-compose --version  # >= 1.29
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/your-repo/synapsetest-qwen.git
-cd synapsetest-qwen
+git clone https://github.com/your-repo/synapsetest.git
+cd synapsetest
 
 # 2. 配置环境变量
 cp .env.example .env

@@ -86,7 +86,7 @@ Max retries exceeded with url: /sentence-transformers/paraphrase-multilingual-Mi
 3. **查看启动日志**:
    - 应该看到新增的输出:
    ```
-   ✓ Loaded configuration from /Users/mengwei/ww/github/synapsetest-qwen/ai-service/.env
+   ✓ Loaded configuration from /Users/mengwei/ww/github/synapsetest/ai-service/.env
    ✓ HuggingFace offline mode enabled (using local model cache)
    ```
 
@@ -101,7 +101,7 @@ Max retries exceeded with url: /sentence-transformers/paraphrase-multilingual-Mi
 
 2. **重新启动**:
    ```bash
-   cd /Users/mengwei/ww/github/synapsetest-qwen/ai-service
+   cd /Users/mengwei/ww/github/synapsetest/ai-service
    source .venv/bin/activate
    python main.py
    ```
@@ -118,7 +118,7 @@ Max retries exceeded with url: /sentence-transformers/paraphrase-multilingual-Mi
 
 **预期输出**:
 ```
-✓ Loaded configuration from /Users/mengwei/ww/github/synapsetest-qwen/ai-service/.env
+✓ Loaded configuration from /Users/mengwei/ww/github/synapsetest/ai-service/.env
 ✓ HuggingFace offline mode enabled (using local model cache)
 2025-12-05 XX:XX:XX - uvicorn.error - INFO - Started server process [XXXX]
 2025-12-05 XX:XX:XX - uvicorn.error - INFO - Waiting for application startup.

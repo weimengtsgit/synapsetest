@@ -37,7 +37,7 @@ AI驱动测试任务管理系统是一个智能化的测试管理平台，通过
 ### 3.1 克隆代码库
 ```bash
 git clone <repository-url>
-cd synapsetest-qwen
+cd synapsetest
 ```
 
 ### 3.2 配置环境变量
