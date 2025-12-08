@@ -74,6 +74,10 @@ class AIConfig:
     # API configuration
     API_PREFIX: str = '/api/v1/ai'
 
+    # Backend service integration
+    BACKEND_URL: str = os.getenv('BACKEND_URL', 'http://localhost:8080')
+    BACKEND_API_TIMEOUT: int = int(os.getenv('BACKEND_API_TIMEOUT', '5'))
+
     # Semantic deduplication
     SIMILARITY_THRESHOLD: float = float(os.getenv('SIMILARITY_THRESHOLD', '0.85'))
 

@@ -57,6 +57,8 @@ class TaskContext(BaseModel):
 
 class RecommendationRequest(BaseModel):
     task_id: str = Field(..., description="Task ID")
+    environment_id: Optional[str] = Field(None, description="Test environment ID")
+    version_id: Optional[str] = Field(None, description="Test version ID")
     context: TaskContext
 
 

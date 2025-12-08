@@ -82,6 +82,15 @@ springdoc:
 api:
   version: 1.0.0
 
+# AI Service Integration Configuration
+services:
+  ai-service:
+    url: ${AI_SERVICE_URL:http://localhost:8000}
+    timeout:
+      connect: 5000  # 5 seconds
+      read: 30000    # 30 seconds
+    base-path: /api/v1/ai
+
 management:
   endpoints:
     web:
@@ -102,16 +111,27 @@ logging:
   file:
     name: logs/application.log
 
-# Resilience4j configuration - temporarily disabled
-#resilience4j:
-#  circuitbreaker:
-#    instances:
-#      default:
-#        register-health-indicator: true
-#        sliding-window-size: 10
-#        minimum-number-of-calls: 5
-#        permitted-number-of-calls-in-half-open-state: 3
-#        automatic-transition-from-open-to-half-open-enabled: true
-#        wait-duration-in-open-state: 5s
-#        failure-rate-threshold: 50
-#        event-consumer-buffer-size: 10
+# Resilience4j configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      aiService:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 5s
+        slow-call-rate-threshold: 50
+  retry:
+    instances:
+      aiService:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - java.net.SocketTimeoutException

@@ -8,6 +8,8 @@ import {
   BulbOutlined,
   HomeOutlined,
   SettingOutlined,
+  ThunderboltOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 import './App.css'
 
@@ -21,6 +23,11 @@ import QualityReport from './components/report/QualityReport'
 import TestVersionList from './components/test-version/TestVersionList'
 import TestEnvironmentList from './components/test-environment/TestEnvironmentList'
 
+// Import new components
+import WorkbenchDashboard from './components/workbench/WorkbenchDashboard'
+import BatchGenerate from './components/test-case/BatchGenerate'
+import StrategyRecommendation from './components/recommendation/StrategyRecommendation'
+
 const { Header, Content, Footer, Sider } = Layout
 
 const App: React.FC = () => {
@@ -32,7 +39,37 @@ const App: React.FC = () => {
     {
       key: '/',
       icon: <HomeOutlined />,
-      label: <Link to="/">首页 (Home)</Link>,
+      label: <Link to="/">工作台 (Workbench)</Link>,
+    },
+    {
+      key: 'test-cases',
+      icon: <FileTextOutlined />,
+      label: '测试用例 (Test Cases)',
+      children: [
+        {
+          key: '/test-cases/generate',
+          label: <Link to="/test-cases/generate">AI生成 (AI Generate)</Link>,
+        },
+        {
+          key: '/test-cases/batch-generate',
+          label: <Link to="/test-cases/batch-generate">批量生成 (Batch)</Link>,
+        },
+        {
+          key: '/test-cases/list',
+          label: <Link to="/test-cases/list">用例列表 (List)</Link>,
+        },
+      ],
+    },
+    {
+      key: 'recommendation',
+      icon: <BulbOutlined />,
+      label: '智能推荐 (AI Recommendation)',
+      children: [
+        {
+          key: '/recommendation/strategy',
+          label: <Link to="/recommendation/strategy">策略推荐 (Strategy)</Link>,
+        },
+      ],
     },
     {
       key: 'test-tasks',
@@ -50,36 +87,14 @@ const App: React.FC = () => {
       ],
     },
     {
-      key: 'test-cases',
-      icon: <BulbOutlined />,
-      label: '测试用例 (Test Cases)',
-      children: [
-        {
-          key: '/test-cases/generate',
-          label: <Link to="/test-cases/generate">AI生成 (AI Generate)</Link>,
-        },
-        {
-          key: '/test-cases/list',
-          label: <Link to="/test-cases/list">用例列表 (List)</Link>,
-        },
-      ],
-    },
-    {
       key: 'monitoring',
       icon: <DashboardOutlined />,
-      label: '监控仪表盘 (Monitoring)',
+      label: '监控分析 (Monitoring)',
       children: [
         {
           key: '/monitoring/dashboard',
           label: <Link to="/monitoring/dashboard">实时监控 (Real-time)</Link>,
         },
-      ],
-    },
-    {
-      key: 'reports',
-      icon: <FileTextOutlined />,
-      label: '质量报告 (Reports)',
-      children: [
         {
           key: '/reports/quality',
           label: <Link to="/reports/quality">质量报告 (Quality)</Link>,
@@ -148,29 +163,29 @@ const App: React.FC = () => {
         </Header>
         <Content style={{ margin: '0', background: '#f0f2f5' }}>
           <Routes>
-            <Route
-              path="/"
-              element={
-                <div style={{ padding: '50px', textAlign: 'center' }}>
-                  <h1>欢迎使用AI驱动测试任务管理系统</h1>
-                  <p style={{ fontSize: '16px', color: '#666' }}>
-                    Welcome to AI-Driven Test Management System
-                  </p>
-                  <p style={{ marginTop: '20px', fontSize: '14px' }}>
-                    请从左侧菜单选择功能模块 (Please select a module from the left menu)
-                  </p>
-                </div>
-              }
-            />
+            {/* Workbench Dashboard as Home */}
+            <Route path="/" element={<WorkbenchDashboard />} />
+
+            {/* Test Cases */}
+            <Route path="/test-cases/generate" element={<AITestCaseGeneration />} />
+            <Route path="/test-cases/batch-generate" element={<BatchGenerate />} />
+            <Route path="/test-cases/list" element={<TestCaseList />} />
+
+            {/* AI Recommendation */}
+            <Route path="/recommendation/strategy" element={<StrategyRecommendation />} />
+
+            {/* Test Tasks */}
             <Route path="/test-tasks/create" element={<CreateTestTask />} />
             <Route path="/test-tasks/list" element={<TestTaskList />} />
-            <Route path="/test-cases/generate" element={<AITestCaseGeneration />} />
-            <Route path="/test-cases/list" element={<TestCaseList />} />
+
+            {/* Monitoring & Reports */}
             <Route path="/monitoring/dashboard" element={<Dashboard />} />
             <Route
               path="/reports/quality"
               element={<QualityReport taskId={selectedTaskId} />}
             />
+
+            {/* Configuration */}
             <Route path="/config/versions" element={<TestVersionList />} />
             <Route path="/config/environments" element={<TestEnvironmentList />} />
           </Routes>

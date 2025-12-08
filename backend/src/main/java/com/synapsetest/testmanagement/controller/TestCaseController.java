@@ -45,66 +45,10 @@ public class TestCaseController {
     }
 
     /**
-     * AI Generate test cases
-     * POST /api/v1/test-cases/generate
-     * Requires mongodb profile to be active
-     */
-    @Operation(
-            summary = "AI生成测试用例",
-            description = "基于需求文本AI生成测试用例，支持去重和优先级排序"
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "生成成功"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "503",
-                    description = "AI服务不可用"
-            )
-    })
-    @PostMapping("/generate")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> generateTestCases(
-            @Parameter(description = "AI测试用例生成请求", required = true)
-            @Valid @RequestBody GenerateTestCaseRequest request) {
-
-        if (aiGenerationService == null) {
-            return ResponseEntity
-                    .status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(ApiResponse.error("AI generation service is not available. Please activate mongodb profile."));
-        }
-
-        // Convert GenerateTestCaseRequest to AITestCaseGenerationRequest
-        AITestCaseGenerationRequest aiRequest = new AITestCaseGenerationRequest();
-        aiRequest.setInput(request.getRequirementText());
-        aiRequest.setTestType("FUNCTIONAL");
-
-        List<TestCaseResponse> generatedCases = aiGenerationService.generateTestCases(aiRequest);
-        Double confidenceScore = aiGenerationService.calculateConfidenceScore(aiRequest);
-
-        // Apply deduplication if requested
-        int duplicatesRemoved = 0;
-        if (Boolean.TRUE.equals(request.getEnableDeduplication()) && aiOptimizationService != null) {
-            int originalSize = generatedCases.size();
-            generatedCases = aiOptimizationService.deduplicateTestCases(generatedCases);
-            duplicatesRemoved = originalSize - generatedCases.size();
-        }
-
-        Map<String, Object> result = Map.of(
-                "test_cases", generatedCases,
-                "confidence_score", confidenceScore,
-                "duplicates_removed", duplicatesRemoved,
-                "count", generatedCases.size()
-        );
-
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(ApiResponse.success("Test cases generated successfully", result));
-    }
-
-    /**
      * Create a new test case
      * POST /api/v1/test-cases
+     *
+     * Note: AI generation has been moved to /api/v1/ai/testcase/generate
      */
     @Operation(
             summary = "创建测试用例",
@@ -262,57 +206,13 @@ public class TestCaseController {
     /**
      * Delete test case
      * DELETE /api/v1/test-cases/{id}
+     *
+     * Note: AI deduplication has been moved to /api/v1/ai/testcase/optimize/deduplicate
+     * Note: AI quality analysis has been moved to /api/v1/ai/testcase/analyze/quality
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTestCase(@PathVariable String id) {
         testCaseService.deleteTestCase(id);
         return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * Deduplicate test cases
-     * POST /api/v1/test-cases/deduplicate
-     * Requires mongodb profile to be active
-     */
-    @PostMapping("/deduplicate")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> deduplicateTestCases(
-            @RequestBody List<TestCaseResponse> testCases) {
-
-        if (aiOptimizationService == null) {
-            return ResponseEntity
-                    .status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(ApiResponse.error("AI optimization service is not available. Please activate mongodb profile."));
-        }
-
-        List<TestCaseResponse> optimized = aiOptimizationService.deduplicateTestCases(testCases);
-
-        Map<String, Object> result = Map.of(
-                "original", testCases.size(),
-                "optimized", optimized.size(),
-                "reduction", String.format("%.1f%%", (1 - (double) optimized.size() / testCases.size()) * 100),
-                "testCases", optimized
-        );
-
-        return ResponseEntity.ok(ApiResponse.success("Test cases deduplicated", result));
-    }
-
-    /**
-     * Analyze test coverage
-     * POST /api/v1/test-cases/analyze-coverage
-     * Requires mongodb profile to be active
-     */
-    @PostMapping("/analyze-coverage")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> analyzeTestCoverage(
-            @RequestBody List<TestCaseResponse> testCases) {
-
-        if (aiOptimizationService == null) {
-            return ResponseEntity
-                    .status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(ApiResponse.error("AI optimization service is not available. Please activate mongodb profile."));
-        }
-
-        Map<String, Object> coverage = aiOptimizationService.analyzeTestCoverage(testCases);
-
-        return ResponseEntity.ok(ApiResponse.success("Test coverage analyzed", coverage));
     }
 }
