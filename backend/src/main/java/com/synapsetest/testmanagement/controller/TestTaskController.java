@@ -259,6 +259,8 @@ public class TestTaskController {
     /**
      * Delete a test task (soft delete)
      * DELETE /api/v1/test-tasks/{id}
+     *
+     * Note: AI recommendation has been moved to /api/v1/ai/recommendation/strategy
      */
     @Operation(
             summary = "删除测试任务",
@@ -280,81 +282,5 @@ public class TestTaskController {
             @PathVariable String id) {
         testTaskService.deleteTestTask(id);
         return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * Get AI recommendation for test task
-     * POST /api/v1/test-tasks/ai/recommendation
-     */
-    @Operation(
-            summary = "获取AI测试推荐",
-            description = "基于代码变更信息获取AI推荐的测试策略"
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "推荐生成成功"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "请求参数无效"
-            )
-    })
-    @PostMapping("/ai/recommendation")
-    public ResponseEntity<java.util.Map<String, Object>> getAiRecommendation(
-            @Parameter(description = "推荐上下文", required = true)
-            @RequestBody java.util.Map<String, Object> context) {
-        
-        // Build CreateTestTaskRequest from context
-        CreateTestTaskRequest request = new CreateTestTaskRequest();
-        request.setTaskName("AI Recommendation Request");
-        request.setEnvironment((String) context.getOrDefault("environment", "DEV"));
-        request.setVersion((String) context.getOrDefault("version", "1.0.0"));
-        
-        @SuppressWarnings("unchecked")
-        List<String> modules = (List<String>) context.get("modules");
-        request.setModules(modules != null ? modules : List.of("default"));
-        
-        @SuppressWarnings("unchecked")
-        java.util.Map<String, Object> codeChange = (java.util.Map<String, Object>) context.get("code_change");
-        if (codeChange == null) {
-            codeChange = new java.util.HashMap<>();
-            codeChange.put("changed_files_count", 0);
-            codeChange.put("changed_lines_count", 0);
-        }
-        request.setCodeChangeInfo(codeChange);
-        
-        // Get AI recommendation
-        TestTaskResponse.TestRecommendation recommendation = 
-            testTaskService.getAiRecommendation(request);
-        
-        // Convert to response format
-        java.util.Map<String, Object> response = new java.util.HashMap<>();
-        response.put("test_scope", recommendation.getRecommendedScope());
-        response.put("environment", recommendation.getRecommendedEnvironment());
-        response.put("version", recommendation.getRecommendedVersion());
-        response.put("priority", calculatePriority(recommendation.getRecommendedScope()));
-        response.put("confidence", recommendation.getConfidenceScore());
-        response.put("reasoning", recommendation.getReasoning());
-        
-        return ResponseEntity.ok(response);
-    }
-    
-    /**
-     * Calculate priority based on test scope
-     */
-    private int calculatePriority(String testScope) {
-        if (testScope == null) return 5;
-        
-        switch (testScope) {
-            case "SMOKE":
-                return 8;
-            case "CORE":
-                return 9;
-            case "FULL":
-                return 6;
-            default:
-                return 5;
-        }
     }
 }

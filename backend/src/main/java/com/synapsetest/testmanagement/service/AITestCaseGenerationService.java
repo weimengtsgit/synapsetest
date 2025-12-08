@@ -1,12 +1,16 @@
 package com.synapsetest.testmanagement.service;
 
+import com.synapsetest.testmanagement.client.AIServiceClient;
 import com.synapsetest.testmanagement.dto.AITestCaseGenerationRequest;
+import com.synapsetest.testmanagement.dto.ai.AITestCaseGenerationResponse;
+import com.synapsetest.testmanagement.dto.ai.GeneratedTestCase;
 import com.synapsetest.testmanagement.dto.response.TestCaseResponse;
+import com.synapsetest.testmanagement.model.TestCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -17,35 +21,162 @@ import java.util.List;
  *
  * Task: T049 [US2] Implement AI测试用例生成服务
  *
- * This service uses AI/ML models to generate test cases from:
+ * This service uses AI-Service to generate test cases from:
  * - Natural language requirements
  * - User stories
  * - API documentation
  * - UI screenshots
+ *
+ * Architecture: Backend -> AI-Service (FastAPI + LLM)
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Profile("mongodb")
 public class AITestCaseGenerationService {
 
-    private final AIModelService aiModelService;
+    private final AIServiceClient aiServiceClient;
+    private final TestCaseService testCaseService;
 
     /**
      * Generate test cases from natural language input
      *
      * Algorithm:
-     * 1. Parse and analyze input text
-     * 2. Extract key scenarios and edge cases
-     * 3. Generate test steps using LLM
-     * 4. Create expected results
-     * 5. Assign priority and categorize
+     * 1. Call AI-Service to generate test cases using LLM
+     * 2. Convert AI response to TestCase format
+     * 3. Save generated cases to database
+     * 4. Return responses
+     *
+     * Fallback: If AI-Service is unavailable, use local rule-based generation
      */
     public List<TestCaseResponse> generateTestCases(AITestCaseGenerationRequest request) {
-        log.info("Generating test cases from input: {}", request.getInput().substring(0, Math.min(50, request.getInput().length())));
+        log.info("Generating test cases from input: {}",
+            request.getInput().substring(0, Math.min(50, request.getInput().length())));
 
-        // For MVP, use rule-based generation with templates
-        // In production, this would use fine-tuned LLM models (Qwen, Llama)
+        try {
+            // Call AI-Service to generate test cases
+            AITestCaseGenerationResponse aiResponse = aiServiceClient.generateTestCases(request);
+
+            if (!aiResponse.isSuccess() || aiResponse.getGeneratedCases() == null) {
+                log.warn("AI Service returned unsuccessful response, falling back to local generation");
+                return generateTestCasesLocally(request);
+            }
+
+            // Convert AI generated cases to TestCaseResponse
+            List<TestCaseResponse> generatedCases = new ArrayList<>();
+
+            for (GeneratedTestCase aiCase : aiResponse.getGeneratedCases()) {
+                TestCase testCase = convertToTestCase(aiCase, request);
+
+                // Save to database if testCaseService is available
+                try {
+                    TestCase saved = testCaseService.createTestCase(testCase);
+                    generatedCases.add(convertToResponse(saved));
+                } catch (Exception e) {
+                    log.warn("Failed to save test case to database: {}", e.getMessage());
+                    // Still add to response even if save failed
+                    generatedCases.add(convertToResponse(testCase));
+                }
+            }
+
+            log.info("Successfully generated {} test cases from AI-Service", generatedCases.size());
+            return generatedCases;
+
+        } catch (Exception e) {
+            log.error("Failed to generate test cases from AI-Service: {}", e.getMessage());
+            log.info("Falling back to local rule-based generation");
+            return generateTestCasesLocally(request);
+        }
+    }
+
+    /**
+     * Convert AI GeneratedTestCase to Backend TestCase model
+     */
+    private TestCase convertToTestCase(GeneratedTestCase aiCase, AITestCaseGenerationRequest request) {
+        TestCase testCase = new TestCase();
+
+        testCase.setTitle(aiCase.getName());
+        testCase.setDescription(aiCase.getDescription());
+
+        // Convert steps list to JSON string or concatenated string
+        if (aiCase.getSteps() != null) {
+            testCase.setSteps(String.join("\n", aiCase.getSteps()));
+        }
+
+        testCase.setExpectedResults(aiCase.getExpectedResult());
+
+        // Convert AI priority (P0,P1,P2,P3) to Backend priority (1-10)
+        testCase.setPriority(convertPriority(aiCase.getPriority()));
+
+        // Set type
+        testCase.setType(aiCase.getType() != null ? aiCase.getType() : "FUNCTIONAL");
+
+        // Set status
+        testCase.setStatus("DRAFT");
+
+        // Set tags
+        testCase.setTags(aiCase.getTags() != null ? String.join(",", aiCase.getTags()) : "ai-generated");
+
+        // Set related requirement
+        testCase.setRelatedRequirement(request.getRelatedRequirement());
+
+        // Set timestamps
+        testCase.setCreatedAt(LocalDateTime.now());
+        testCase.setUpdatedAt(LocalDateTime.now());
+
+        return testCase;
+    }
+
+    /**
+     * Convert AI priority (P0-P3) to Backend priority (1-10)
+     */
+    private Integer convertPriority(String aiPriority) {
+        if (aiPriority == null) return 5;
+
+        switch (aiPriority.toUpperCase()) {
+            case "P0": return 10;  // Critical
+            case "P1": return 8;   // High
+            case "P2": return 5;   // Medium
+            case "P3": return 3;   // Low
+            default: return 5;
+        }
+    }
+
+    /**
+     * Convert TestCase model to TestCaseResponse
+     */
+    private TestCaseResponse convertToResponse(TestCase testCase) {
+        TestCaseResponse response = new TestCaseResponse();
+
+        response.setId(testCase.getId());
+        response.setTitle(testCase.getTitle());
+        response.setDescription(testCase.getDescription());
+
+        // Convert steps string back to list
+        if (testCase.getSteps() != null) {
+            response.setSteps(Arrays.asList(testCase.getSteps().split("\n")));
+        }
+
+        response.setExpectedResults(testCase.getExpectedResults());
+        response.setPriority(testCase.getPriority());
+        response.setType(testCase.getType());
+        response.setStatus(testCase.getStatus());
+
+        // Convert tags string back to list
+        if (testCase.getTags() != null) {
+            response.setTags(Arrays.asList(testCase.getTags().split(",")));
+        }
+
+        response.setRelatedRequirement(testCase.getRelatedRequirement());
+
+        return response;
+    }
+
+    /**
+     * Fallback: Local rule-based generation
+     * This is used when AI-Service is unavailable
+     */
+    private List<TestCaseResponse> generateTestCasesLocally(AITestCaseGenerationRequest request) {
+        log.info("Using local rule-based generation");
 
         List<TestCaseResponse> generatedCases = new ArrayList<>();
 
@@ -59,7 +190,7 @@ public class AITestCaseGenerationService {
             generatedCases.add(testCase);
         }
 
-        log.info("Generated {} test cases", generatedCases.size());
+        log.info("Generated {} test cases locally", generatedCases.size());
 
         return generatedCases;
     }
