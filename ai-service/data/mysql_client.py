@@ -1,13 +1,14 @@
 """
-MySQL Client for AI Service
+MySQL Client for AI Service - UNIFIED WITH BACKEND
 
-Replaces MongoDB as the structured data storage layer in RAG architecture
-Integrates with Backend Service's MySQL database
+⚠️ CRITICAL: Uses Backend Service's test_cases table for data consistency
+This replaces MongoDB as the structured data storage layer in RAG architecture
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import logging
 import json
+import uuid
 
 try:
     import pymysql
@@ -26,12 +27,26 @@ class MySQLClient:
     """
     MySQL client for AI training data and test case storage
     
-    Integrates with Backend Service's MySQL database
-    Provides the same interface as MongoDB client for easy migration
+    ⚠️ CRITICAL: Uses Backend Service's test_cases table for consistency
+    
+    Backend's test_cases table structure (schema.sql):
+    - id: CHAR(36) PRIMARY KEY (UUID)
+    - title: VARCHAR(200) - Test case title
+    - description: TEXT
+    - steps: JSON - Test steps
+    - expected_result: TEXT - Expected result (SINGULAR!)
+    - priority: INTEGER (0-10)
+    - type: VARCHAR(20) - FUNCTIONAL, PERFORMANCE, SECURITY
+    - status: VARCHAR(20) - DRAFT, APPROVED, DEPRECATED
+    - tags: JSON
+    - related_requirement: VARCHAR(200)
+    - created_at: TIMESTAMP
+    - updated_at: TIMESTAMP
+    - created_by: VARCHAR(100)
     """
 
     _instance: Optional['MySQLClient'] = None
-    _connection_pool: Optional[Any] = None
+    _connection: Optional[Any] = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -43,7 +58,7 @@ class MySQLClient:
             logger.warning("pymysql not available, using mock mode")
             return
 
-        if self._connection_pool is None:
+        if self._connection is None:
             try:
                 # Parse MySQL URI
                 # Format: mysql://user:password@host:port/database
@@ -75,52 +90,28 @@ class MySQLClient:
                     autocommit=False
                 )
                 
-                logger.info(f"Connected to MySQL: {database}@{host}:{port}")
+                logger.info(f"✅ Connected to MySQL: {database}@{host}:{port}")
                 
-                # Initialize tables if needed
+                # Initialize AI-specific tables only
                 self._init_tables()
                 
             except Exception as e:
-                logger.error(f"Failed to connect to MySQL: {e}")
+                logger.error(f"❌ Failed to connect to MySQL: {e}")
                 self._connection = None
 
     def _init_tables(self):
         """
-        Initialize required tables for AI Service
+        Initialize AI-specific tables only
         
-        Note: Main test case tables should already exist in Backend Service
-        This creates additional AI-specific tables
+        ⚠️ IMPORTANT: We do NOT create test_cases table here!
+        Backend Service manages the test_cases table.
+        We only create AI-specific tables for history tracking.
         """
         if not self._connection:
             return
 
         try:
             with self._connection.cursor() as cursor:
-                # Historical test cases table (for RAG reference)
-                # This stores high-quality historical cases for training
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS historical_testcases (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        testcase_id VARCHAR(100) UNIQUE,
-                        name VARCHAR(500) NOT NULL,
-                        module VARCHAR(100),
-                        priority ENUM('P0', 'P1', 'P2', 'P3') DEFAULT 'P2',
-                        type VARCHAR(50) DEFAULT '功能测试',
-                        description TEXT,
-                        steps JSON,
-                        preconditions JSON,
-                        expected_result TEXT,
-                        tags JSON,
-                        status VARCHAR(20) DEFAULT 'active',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                        INDEX idx_module (module),
-                        INDEX idx_priority (priority),
-                        INDEX idx_status (status),
-                        INDEX idx_created_at (created_at)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                """)
-
                 # Test case generation history
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS testcase_generation_history (
@@ -169,10 +160,10 @@ class MySQLClient:
                 """)
 
                 self._connection.commit()
-                logger.info("MySQL tables initialized successfully")
+                logger.info("✅ AI-specific MySQL tables initialized successfully")
 
         except Exception as e:
-            logger.error(f"Failed to initialize tables: {e}")
+            logger.error(f"❌ Failed to initialize tables: {e}")
             self._connection.rollback()
 
     def _get_cursor(self):
@@ -180,6 +171,451 @@ class MySQLClient:
         if not self._connection:
             return None
         return self._connection.cursor()
+
+    # ========================================================================
+    # Field Mapping Methods - Convert between AI Service and Backend formats
+    # ========================================================================
+
+    def _map_priority_to_backend(self, priority: Any) -> int:
+        """
+        Map AI Service priority (P0-P3 or string) to Backend priority (0-10)
+        
+        Mapping:
+        - P0 / 'P0' / 'highest' -> 10
+        - P1 / 'P1' / 'high' -> 7
+        - P2 / 'P2' / 'medium' -> 5
+        - P3 / 'P3' / 'low' -> 3
+        - numeric value -> use as-is (0-10)
+        """
+        if isinstance(priority, int):
+            # Already numeric, clamp to 0-10
+            return max(0, min(10, priority))
+        
+        priority_str = str(priority).upper()
+        
+        mapping = {
+            'P0': 10,
+            'P1': 7,
+            'P2': 5,
+            'P3': 3,
+            'HIGHEST': 10,
+            'HIGH': 7,
+            'MEDIUM': 5,
+            'LOW': 3
+        }
+        
+        return mapping.get(priority_str, 5)  # Default to 5 (medium)
+
+    def _map_priority_from_backend(self, priority: int) -> str:
+        """
+        Map Backend priority (0-10) to AI Service priority (P0-P3)
+        
+        Mapping:
+        - 9-10 -> P0
+        - 7-8 -> P1
+        - 4-6 -> P2
+        - 0-3 -> P3
+        """
+        if priority >= 9:
+            return 'P0'
+        elif priority >= 7:
+            return 'P1'
+        elif priority >= 4:
+            return 'P2'
+        else:
+            return 'P3'
+
+    def _map_type_to_backend(self, test_type: str) -> str:
+        """
+        Map AI Service test type (Chinese) to Backend type (English)
+        
+        Mapping:
+        - 功能测试 -> FUNCTIONAL
+        - 性能测试 -> PERFORMANCE
+        - 安全测试 -> SECURITY
+        - Already English -> use as-is
+        """
+        mapping = {
+            '功能测试': 'FUNCTIONAL',
+            '性能测试': 'PERFORMANCE',
+            '安全测试': 'SECURITY',
+            'FUNCTIONAL': 'FUNCTIONAL',
+            'PERFORMANCE': 'PERFORMANCE',
+            'SECURITY': 'SECURITY'
+        }
+        
+        return mapping.get(test_type, 'FUNCTIONAL')  # Default to FUNCTIONAL
+
+    def _map_type_from_backend(self, test_type: str) -> str:
+        """
+        Map Backend type (English) to AI Service type (Chinese)
+        """
+        mapping = {
+            'FUNCTIONAL': '功能测试',
+            'PERFORMANCE': '性能测试',
+            'SECURITY': '安全测试'
+        }
+        
+        return mapping.get(test_type, '功能测试')
+
+    def _map_status_to_backend(self, status: str) -> str:
+        """
+        Map AI Service status to Backend status
+        
+        Mapping:
+        - active -> APPROVED
+        - draft -> DRAFT
+        - deleted / deprecated -> DEPRECATED
+        - Already Backend format -> use as-is
+        """
+        mapping = {
+            'active': 'APPROVED',
+            'draft': 'DRAFT',
+            'deleted': 'DEPRECATED',
+            'deprecated': 'DEPRECATED',
+            'DRAFT': 'DRAFT',
+            'APPROVED': 'APPROVED',
+            'DEPRECATED': 'DEPRECATED'
+        }
+        
+        return mapping.get(status, 'DRAFT')  # Default to DRAFT
+
+    def _map_status_from_backend(self, status: str) -> str:
+        """
+        Map Backend status to AI Service status
+        """
+        mapping = {
+            'DRAFT': 'draft',
+            'APPROVED': 'active',
+            'DEPRECATED': 'deprecated'
+        }
+        
+        return mapping.get(status, 'draft')
+
+    # ========================================================================
+    # Test Case Operations - Using Backend's test_cases table
+    # ========================================================================
+
+    def get_similar_testcases(self, module: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Get similar test cases for a module from Backend's test_cases table
+        
+        Uses tags field to match module (since Backend doesn't have module field)
+        
+        Note: This method returns cases by module match only.
+        For semantic similarity search, use VectorDBClient.search_similar()
+        combined with this method to get full data.
+        """
+        if not self._connection:
+            return []
+
+        try:
+            with self._get_cursor() as cursor:
+                # Search in tags JSON field for module
+                cursor.execute("""
+                    SELECT * FROM test_cases
+                    WHERE JSON_CONTAINS(tags, JSON_QUOTE(%s))
+                       OR description LIKE %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                """, (module, f'%{module}%', limit))
+                
+                results = cursor.fetchall()
+                
+                # Parse JSON fields and map to AI Service format
+                for result in results:
+                    if result.get('steps'):
+                        result['steps'] = json.loads(result['steps']) if isinstance(result['steps'], str) else result['steps']
+                    if result.get('tags'):
+                        result['tags'] = json.loads(result['tags']) if isinstance(result['tags'], str) else result['tags']
+                    
+                    # Map fields for backward compatibility
+                    result['name'] = result.get('title')
+                    result['module'] = module
+                    result['priority_level'] = self._map_priority_from_backend(result.get('priority', 5))
+                    result['test_type'] = self._map_type_from_backend(result.get('type', 'FUNCTIONAL'))
+                
+                return results
+                
+        except Exception as e:
+            logger.error(f"Failed to get similar testcases: {e}")
+            return []
+
+    def get_testcase_by_id(self, testcase_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get complete test case data by ID from Backend's test_cases table
+        
+        Args:
+            testcase_id: Test case UUID
+            
+        Returns:
+            Complete test case data
+        """
+        if not self._connection:
+            return None
+
+        try:
+            with self._get_cursor() as cursor:
+                cursor.execute("""
+                    SELECT * FROM test_cases WHERE id = %s
+                """, (testcase_id,))
+                
+                result = cursor.fetchone()
+                
+                if result:
+                    # Parse JSON fields
+                    if result.get('steps'):
+                        result['steps'] = json.loads(result['steps']) if isinstance(result['steps'], str) else result['steps']
+                    if result.get('tags'):
+                        result['tags'] = json.loads(result['tags']) if isinstance(result['tags'], str) else result['tags']
+                    
+                    # Map fields for backward compatibility
+                    result['name'] = result.get('title')
+                    result['priority_level'] = self._map_priority_from_backend(result.get('priority', 5))
+                    result['test_type'] = self._map_type_from_backend(result.get('type', 'FUNCTIONAL'))
+                
+                return result
+                
+        except Exception as e:
+            logger.error(f"Failed to get testcase by id: {e}")
+            return None
+
+    def get_testcases_by_ids(self, testcase_ids: List[str]) -> List[Dict[str, Any]]:
+        """
+        Batch get test cases by IDs from Backend's test_cases table
+        
+        Args:
+            testcase_ids: List of test case UUIDs
+            
+        Returns:
+            List of complete test case data
+        """
+        if not self._connection or not testcase_ids:
+            return []
+
+        try:
+            with self._get_cursor() as cursor:
+                placeholders = ','.join(['%s'] * len(testcase_ids))
+                query = f"""
+                    SELECT * FROM test_cases
+                    WHERE id IN ({placeholders})
+                """
+                
+                cursor.execute(query, testcase_ids)
+                results = cursor.fetchall()
+                
+                # Parse JSON fields and map to AI Service format
+                for result in results:
+                    if result.get('steps'):
+                        result['steps'] = json.loads(result['steps']) if isinstance(result['steps'], str) else result['steps']
+                    if result.get('tags'):
+                        result['tags'] = json.loads(result['tags']) if isinstance(result['tags'], str) else result['tags']
+                    
+                    # Map fields for backward compatibility
+                    result['name'] = result.get('title')
+                    result['priority_level'] = self._map_priority_from_backend(result.get('priority', 5))
+                    result['test_type'] = self._map_type_from_backend(result.get('type', 'FUNCTIONAL'))
+                
+                return results
+                
+        except Exception as e:
+            logger.error(f"Failed to batch get testcases: {e}")
+            return []
+
+    def save_testcase(self, testcase_data: Dict[str, Any]) -> Optional[str]:
+        """
+        Save a new test case to Backend's test_cases table
+        
+        ⚠️ IMPORTANT: This inserts into Backend's test_cases table
+        
+        Args:
+            testcase_data: Test case data (can be in AI Service format)
+                - name or title: Test case name
+                - description: Description
+                - steps: Test steps (list or JSON)
+                - expected_result: Expected result
+                - priority: Priority (P0-P3 or 0-10)
+                - type: Type (Chinese or English)
+                - status: Status (active/draft or DRAFT/APPROVED)
+                - tags: Tags (list or JSON)
+                - module: Module name (will be added to tags)
+                - related_requirement: Related requirement
+            
+        Returns:
+            Inserted test case UUID
+        """
+        if not self._connection:
+            logger.warning("MySQL not available, skipping save")
+            return None
+
+        try:
+            # Generate UUID for test case
+            testcase_id = str(uuid.uuid4())
+            
+            # Extract and map fields
+            title = testcase_data.get('name') or testcase_data.get('title', 'Untitled Test Case')
+            description = testcase_data.get('description', '')
+            
+            # Handle steps - ensure it's JSON
+            steps = testcase_data.get('steps', [])
+            if isinstance(steps, list):
+                steps_json = json.dumps(steps, ensure_ascii=False)
+            elif isinstance(steps, str):
+                try:
+                    json.loads(steps)  # Validate JSON
+                    steps_json = steps
+                except:
+                    steps_json = json.dumps([steps], ensure_ascii=False)
+            else:
+                steps_json = json.dumps([str(steps)], ensure_ascii=False)
+            
+            expected_result = testcase_data.get('expected_result', '')
+            
+            # Map priority
+            priority = self._map_priority_to_backend(testcase_data.get('priority', 'P2'))
+            
+            # Map type
+            test_type = self._map_type_to_backend(testcase_data.get('type', '功能测试'))
+            
+            # Map status
+            status = self._map_status_to_backend(testcase_data.get('status', 'draft'))
+            
+            # Handle tags - add module to tags if present
+            tags = testcase_data.get('tags', [])
+            if not isinstance(tags, list):
+                tags = [tags] if tags else []
+            
+            # Add module to tags if provided
+            module = testcase_data.get('module')
+            if module and module not in tags:
+                tags.append(module)
+            
+            tags_json = json.dumps(tags, ensure_ascii=False)
+            
+            related_requirement = testcase_data.get('related_requirement', '')
+            created_by = testcase_data.get('created_by', 'ai-service')
+            
+            with self._get_cursor() as cursor:
+                # Insert into Backend's test_cases table
+                cursor.execute("""
+                    INSERT INTO test_cases
+                    (id, title, description, steps, expected_result, priority,
+                     type, status, tags, related_requirement, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    testcase_id,
+                    title,
+                    description,
+                    steps_json,
+                    expected_result,
+                    priority,
+                    test_type,
+                    status,
+                    tags_json,
+                    related_requirement,
+                    created_by
+                ))
+                self._connection.commit()
+                
+                logger.info(f"✅ Saved test case to Backend's test_cases table: {testcase_id}")
+                return testcase_id
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to save testcase: {e}")
+            self._connection.rollback()
+            return None
+
+    def update_testcase(
+        self,
+        testcase_id: str,
+        update_data: Dict[str, Any]
+    ) -> bool:
+        """
+        Update an existing test case in Backend's test_cases table
+        
+        Args:
+            testcase_id: Test case UUID
+            update_data: Data to update
+            
+        Returns:
+            Success status
+        """
+        if not self._connection:
+            return False
+
+        try:
+            # Build SET clause dynamically
+            set_parts = []
+            params = []
+            
+            # Map fields
+            field_mapping = {
+                'name': 'title',
+                'title': 'title',
+                'description': 'description',
+                'steps': 'steps',
+                'expected_result': 'expected_result',
+                'priority': 'priority',
+                'type': 'type',
+                'status': 'status',
+                'tags': 'tags',
+                'related_requirement': 'related_requirement'
+            }
+            
+            for key, value in update_data.items():
+                if key in ['id', 'created_at', 'created_by']:  # Skip these fields
+                    continue
+                
+                backend_field = field_mapping.get(key)
+                if not backend_field:
+                    continue
+                
+                set_parts.append(f"{backend_field} = %s")
+                
+                # Convert and validate values
+                if backend_field == 'priority':
+                    params.append(self._map_priority_to_backend(value))
+                elif backend_field == 'type':
+                    params.append(self._map_type_to_backend(value))
+                elif backend_field == 'status':
+                    params.append(self._map_status_to_backend(value))
+                elif backend_field in ['steps', 'tags']:
+                    if isinstance(value, (list, dict)):
+                        params.append(json.dumps(value, ensure_ascii=False))
+                    else:
+                        params.append(value)
+                else:
+                    params.append(value)
+            
+            if not set_parts:
+                return False
+            
+            # Add updated_at
+            set_parts.append("updated_at = NOW()")
+            
+            # Add testcase_id to params
+            params.append(testcase_id)
+            
+            with self._get_cursor() as cursor:
+                query = f"""
+                    UPDATE test_cases
+                    SET {', '.join(set_parts)}
+                    WHERE id = %s
+                """
+                
+                cursor.execute(query, params)
+                self._connection.commit()
+                
+                return cursor.rowcount > 0
+                
+        except Exception as e:
+            logger.error(f"Failed to update testcase: {e}")
+            self._connection.rollback()
+            return False
+
+    # ========================================================================
+    # AI Service History Operations
+    # ========================================================================
 
     def save_recommendation_history(self, data: Dict[str, Any]) -> Optional[int]:
         """Save recommendation history"""
@@ -234,253 +670,6 @@ class MySQLClient:
             logger.error(f"Failed to save generation history: {e}")
             self._connection.rollback()
             return None
-
-    def get_similar_testcases(self, module: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """
-        Get similar historical test cases for a module
-        
-        Note: This method returns cases by module match only.
-        For semantic similarity search, use VectorDBClient.search_similar()
-        combined with this method to get full data.
-        """
-        if not self._connection:
-            return []
-
-        try:
-            with self._get_cursor() as cursor:
-                cursor.execute("""
-                    SELECT * FROM historical_testcases
-                    WHERE module = %s AND status = 'active'
-                    ORDER BY created_at DESC
-                    LIMIT %s
-                """, (module, limit))
-                
-                results = cursor.fetchall()
-                
-                # Parse JSON fields
-                for result in results:
-                    if result.get('steps'):
-                        result['steps'] = json.loads(result['steps']) if isinstance(result['steps'], str) else result['steps']
-                    if result.get('preconditions'):
-                        result['preconditions'] = json.loads(result['preconditions']) if isinstance(result['preconditions'], str) else result['preconditions']
-                    if result.get('tags'):
-                        result['tags'] = json.loads(result['tags']) if isinstance(result['tags'], str) else result['tags']
-                
-                return results
-                
-        except Exception as e:
-            logger.error(f"Failed to get similar testcases: {e}")
-            return []
-
-    def get_testcase_by_id(self, testcase_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get complete test case data by ID
-        
-        Args:
-            testcase_id: Test case ID
-            
-        Returns:
-            Complete test case data
-        """
-        if not self._connection:
-            return None
-
-        try:
-            with self._get_cursor() as cursor:
-                # Try by primary key first
-                if testcase_id.isdigit():
-                    cursor.execute("""
-                        SELECT * FROM historical_testcases WHERE id = %s
-                    """, (int(testcase_id),))
-                else:
-                    cursor.execute("""
-                        SELECT * FROM historical_testcases WHERE testcase_id = %s
-                    """, (testcase_id,))
-                
-                result = cursor.fetchone()
-                
-                if result:
-                    # Parse JSON fields
-                    if result.get('steps'):
-                        result['steps'] = json.loads(result['steps']) if isinstance(result['steps'], str) else result['steps']
-                    if result.get('preconditions'):
-                        result['preconditions'] = json.loads(result['preconditions']) if isinstance(result['preconditions'], str) else result['preconditions']
-                    if result.get('tags'):
-                        result['tags'] = json.loads(result['tags']) if isinstance(result['tags'], str) else result['tags']
-                
-                return result
-                
-        except Exception as e:
-            logger.error(f"Failed to get testcase by id: {e}")
-            return None
-
-    def get_testcases_by_ids(self, testcase_ids: List[str]) -> List[Dict[str, Any]]:
-        """
-        Batch get test cases by IDs
-        
-        Args:
-            testcase_ids: List of test case IDs
-            
-        Returns:
-            List of complete test case data
-        """
-        if not self._connection or not testcase_ids:
-            return []
-
-        try:
-            with self._get_cursor() as cursor:
-                # Separate numeric and string IDs
-                numeric_ids = [int(tid) for tid in testcase_ids if tid.isdigit()]
-                string_ids = [tid for tid in testcase_ids if not tid.isdigit()]
-                
-                conditions = []
-                params = []
-                
-                if numeric_ids:
-                    placeholders = ','.join(['%s'] * len(numeric_ids))
-                    conditions.append(f"id IN ({placeholders})")
-                    params.extend(numeric_ids)
-                
-                if string_ids:
-                    placeholders = ','.join(['%s'] * len(string_ids))
-                    conditions.append(f"testcase_id IN ({placeholders})")
-                    params.extend(string_ids)
-                
-                if not conditions:
-                    return []
-                
-                query = f"""
-                    SELECT * FROM historical_testcases
-                    WHERE {' OR '.join(conditions)}
-                """
-                
-                cursor.execute(query, params)
-                results = cursor.fetchall()
-                
-                # Parse JSON fields
-                for result in results:
-                    if result.get('steps'):
-                        result['steps'] = json.loads(result['steps']) if isinstance(result['steps'], str) else result['steps']
-                    if result.get('preconditions'):
-                        result['preconditions'] = json.loads(result['preconditions']) if isinstance(result['preconditions'], str) else result['preconditions']
-                    if result.get('tags'):
-                        result['tags'] = json.loads(result['tags']) if isinstance(result['tags'], str) else result['tags']
-                
-                return results
-                
-        except Exception as e:
-            logger.error(f"Failed to batch get testcases: {e}")
-            return []
-
-    def save_testcase(self, testcase_data: Dict[str, Any]) -> Optional[str]:
-        """
-        Save a new test case to MySQL
-        
-        Args:
-            testcase_data: Test case data
-            
-        Returns:
-            Inserted test case ID
-        """
-        if not self._connection:
-            logger.warning("MySQL not available, skipping save")
-            return None
-
-        try:
-            with self._get_cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO historical_testcases
-                    (testcase_id, name, module, priority, type, description,
-                     steps, preconditions, expected_result, tags, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    testcase_data.get('testcase_id'),
-                    testcase_data.get('name'),
-                    testcase_data.get('module'),
-                    testcase_data.get('priority', 'P2'),
-                    testcase_data.get('type', '功能测试'),
-                    testcase_data.get('description'),
-                    json.dumps(testcase_data.get('steps', []), ensure_ascii=False),
-                    json.dumps(testcase_data.get('preconditions', []), ensure_ascii=False),
-                    testcase_data.get('expected_result'),
-                    json.dumps(testcase_data.get('tags', []), ensure_ascii=False),
-                    testcase_data.get('status', 'active')
-                ))
-                self._connection.commit()
-                return str(cursor.lastrowid)
-                
-        except Exception as e:
-            logger.error(f"Failed to save testcase: {e}")
-            self._connection.rollback()
-            return None
-
-    def update_testcase(
-        self,
-        testcase_id: str,
-        update_data: Dict[str, Any]
-    ) -> bool:
-        """
-        Update an existing test case
-        
-        Args:
-            testcase_id: Test case ID
-            update_data: Data to update
-            
-        Returns:
-            Success status
-        """
-        if not self._connection:
-            return False
-
-        try:
-            # Build SET clause dynamically
-            set_parts = []
-            params = []
-            
-            json_fields = ['steps', 'preconditions', 'tags']
-            
-            for key, value in update_data.items():
-                if key in ['id', 'created_at']:  # Skip these fields
-                    continue
-                
-                set_parts.append(f"{key} = %s")
-                
-                # Convert lists/dicts to JSON strings
-                if key in json_fields and (isinstance(value, (list, dict))):
-                    params.append(json.dumps(value, ensure_ascii=False))
-                else:
-                    params.append(value)
-            
-            if not set_parts:
-                return False
-            
-            # Add testcase_id to params
-            params.append(testcase_id)
-            
-            with self._get_cursor() as cursor:
-                # Try numeric ID first
-                if testcase_id.isdigit():
-                    query = f"""
-                        UPDATE historical_testcases
-                        SET {', '.join(set_parts)}
-                        WHERE id = %s
-                    """
-                else:
-                    query = f"""
-                        UPDATE historical_testcases
-                        SET {', '.join(set_parts)}
-                        WHERE testcase_id = %s
-                    """
-                
-                cursor.execute(query, params)
-                self._connection.commit()
-                
-                return cursor.rowcount > 0
-                
-        except Exception as e:
-            logger.error(f"Failed to update testcase: {e}")
-            self._connection.rollback()
-            return False
 
     def get_company_standards(self) -> Dict[str, Any]:
         """Get company testing standards"""

@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * AI Service HTTP Client
@@ -110,7 +111,7 @@ public class AIServiceClient {
                     item.put("include_edge_cases", true);
                     return item;
                 })
-                .toList();
+                    .collect(Collectors.toList());
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("requirements", requirements);

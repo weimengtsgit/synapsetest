@@ -97,12 +97,11 @@ public class AITestCaseGenerationService {
         testCase.setTitle(aiCase.getName());
         testCase.setDescription(aiCase.getDescription());
 
-        // Convert steps list to JSON string or concatenated string
-        if (aiCase.getSteps() != null) {
-            testCase.setSteps(String.join("\n", aiCase.getSteps()));
-        }
+        // Set steps directly as List<String> (no conversion needed)
+        testCase.setSteps(aiCase.getSteps());
 
-        testCase.setExpectedResults(aiCase.getExpectedResult());
+        // Set expected result (singular)
+        testCase.setExpectedResult(aiCase.getExpectedResult());
 
         // Convert AI priority (P0,P1,P2,P3) to Backend priority (1-10)
         testCase.setPriority(convertPriority(aiCase.getPriority()));
@@ -113,15 +112,25 @@ public class AITestCaseGenerationService {
         // Set status
         testCase.setStatus("DRAFT");
 
-        // Set tags
-        testCase.setTags(aiCase.getTags() != null ? String.join(",", aiCase.getTags()) : "ai-generated");
+        // Set tags directly as List<String> (no conversion needed)
+        testCase.setTags(aiCase.getTags() != null ? aiCase.getTags() : Arrays.asList("ai-generated"));
 
         // Set related requirement
         testCase.setRelatedRequirement(request.getRelatedRequirement());
 
-        // Set timestamps
+        // Set AI-related fields
+        testCase.setAiGenerated(true);  // 标记为AI生成
+        testCase.setAiConfidence(0.85f);  // 默认置信度
+
+        // Set module if available
+        if (request.getModule() != null) {
+            testCase.setModule(request.getModule());
+        }
+
+        // Set timestamps (will be auto-set by BaseEntity if using JPA)
         testCase.setCreatedAt(LocalDateTime.now());
         testCase.setUpdatedAt(LocalDateTime.now());
+        testCase.setCreatedBy("ai-service");
 
         return testCase;
     }
@@ -151,22 +160,31 @@ public class AITestCaseGenerationService {
         response.setTitle(testCase.getTitle());
         response.setDescription(testCase.getDescription());
 
-        // Convert steps string back to list
-        if (testCase.getSteps() != null) {
-            response.setSteps(Arrays.asList(testCase.getSteps().split("\n")));
-        }
+        // Steps is already List<String>, set directly
+        response.setSteps(testCase.getSteps());
 
-        response.setExpectedResults(testCase.getExpectedResults());
+        // Use singular form
+        response.setExpectedResult(testCase.getExpectedResult());
         response.setPriority(testCase.getPriority());
         response.setType(testCase.getType());
         response.setStatus(testCase.getStatus());
 
-        // Convert tags string back to list
-        if (testCase.getTags() != null) {
-            response.setTags(Arrays.asList(testCase.getTags().split(",")));
-        }
+        // Tags is already List<String>, set directly
+        response.setTags(testCase.getTags());
 
         response.setRelatedRequirement(testCase.getRelatedRequirement());
+
+        // Set AI-related fields
+        response.setModule(testCase.getModule());
+        response.setPreconditions(testCase.getPreconditions());
+        response.setQualityScore(testCase.getQualityScore());
+        response.setAiGenerated(testCase.getAiGenerated());
+        response.setAiConfidence(testCase.getAiConfidence());
+
+        // Set timestamps
+        response.setCreatedAt(testCase.getCreatedAt());
+        response.setUpdatedAt(testCase.getUpdatedAt());
+        response.setCreatedBy(testCase.getCreatedBy());
 
         return response;
     }
@@ -248,8 +266,8 @@ public class AITestCaseGenerationService {
         // Generate test steps
         testCase.setSteps(generateTestSteps(scenario));
 
-        // Generate expected results
-        testCase.setExpectedResults(generateExpectedResults(scenario));
+        // Generate expected results (use singular form)
+        testCase.setExpectedResult(generateExpectedResults(scenario));
 
         // Assign priority based on scenario type
         testCase.setPriority(determinePriority(scenario));
@@ -265,6 +283,10 @@ public class AITestCaseGenerationService {
 
         // Set related requirement
         testCase.setRelatedRequirement(request.getRelatedRequirement());
+
+        // Set AI-related fields
+        testCase.setAiGenerated(true);
+        testCase.setAiConfidence(0.7f);  // Lower confidence for local generation
 
         return testCase;
     }

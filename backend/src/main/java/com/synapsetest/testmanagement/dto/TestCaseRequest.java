@@ -20,7 +20,7 @@ public class TestCaseRequest {
     @NotEmpty(message = "Steps cannot be empty")
     private List<String> steps;
 
-    private String expectedResults;
+    private String expectedResult;  // 统一使用单数,与TestCase模型和数据库一致
 
     @Min(value = 0, message = "Priority must be at least 0")
     @Max(value = 10, message = "Priority must not exceed 10")
@@ -32,4 +32,8 @@ public class TestCaseRequest {
     private List<String> tags;
 
     private String relatedRequirement;
+
+    // AI-related fields (optional)
+    private String module;
+    private List<String> preconditions;
 }

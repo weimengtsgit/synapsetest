@@ -31,7 +31,7 @@ public class TestCaseService {
     private final TestCaseMapper testCaseMapper;
 
     /**
-     * Create a new test case
+     * Create a new test case from request
      */
     public TestCaseResponse createTestCase(TestCaseRequest request, String username) {
         log.info("Creating test case: {} by user: {}", request.getTitle(), username);
@@ -41,8 +41,8 @@ public class TestCaseService {
         testCase.setTitle(request.getTitle());
         testCase.setDescription(request.getDescription());
         testCase.setSteps(request.getSteps());
-        testCase.setExpectedResult(request.getExpectedResults());
-        testCase.setPriority(request.getPriority() != null ? request.getPriority() : 0);
+        testCase.setExpectedResult(request.getExpectedResult());  // 使用单数
+        testCase.setPriority(request.getPriority() != null ? request.getPriority() : 5);
         testCase.setType(request.getType());
         testCase.setStatus(TestCase.TestCaseStatus.DRAFT.name());
         testCase.setTags(request.getTags());
@@ -56,6 +56,41 @@ public class TestCaseService {
         log.info("Test case created successfully with ID: {}", testCase.getId());
 
         return convertToResponse(testCase);
+    }
+
+    /**
+     * Create a new test case from TestCase entity (for AI-generated cases)
+     * This overloaded method is used when AI-Service generates test cases
+     */
+    public TestCase createTestCase(TestCase testCase) {
+        log.info("Creating test case from entity: {}", testCase.getTitle());
+
+        // Generate ID if not present
+        if (testCase.getId() == null || testCase.getId().isEmpty()) {
+            testCase.setId(UUID.randomUUID().toString());
+        }
+
+        // Set timestamps if not present
+        if (testCase.getCreatedAt() == null) {
+            testCase.setCreatedAt(LocalDateTime.now());
+        }
+        if (testCase.getUpdatedAt() == null) {
+            testCase.setUpdatedAt(LocalDateTime.now());
+        }
+
+        // Set default values if not present
+        if (testCase.getStatus() == null || testCase.getStatus().isEmpty()) {
+            testCase.setStatus(TestCase.TestCaseStatus.DRAFT.name());
+        }
+        if (testCase.getCreatedBy() == null || testCase.getCreatedBy().isEmpty()) {
+            testCase.setCreatedBy("system");
+        }
+
+        testCaseMapper.insert(testCase);
+
+        log.info("Test case created successfully with ID: {}", testCase.getId());
+
+        return testCase;
     }
 
     /**
@@ -112,7 +147,7 @@ public class TestCaseService {
         testCase.setTitle(request.getTitle());
         testCase.setDescription(request.getDescription());
         testCase.setSteps(request.getSteps());
-        testCase.setExpectedResult(request.getExpectedResults());
+        testCase.setExpectedResult(request.getExpectedResult());  // 使用单数
         testCase.setPriority(request.getPriority());
         testCase.setType(request.getType());
         testCase.setTags(request.getTags());
@@ -261,7 +296,7 @@ public class TestCaseService {
         response.setCaseName(testCase.getTitle()); // 设置caseName字段，使用与title相同的值
         response.setDescription(testCase.getDescription());
         response.setSteps(testCase.getSteps());
-        response.setExpectedResults(testCase.getExpectedResult());
+        response.setExpectedResult(testCase.getExpectedResult());  // 使用单数
         response.setPriority(testCase.getPriority());
         response.setType(testCase.getType());
         response.setStatus(testCase.getStatus());
@@ -271,9 +306,12 @@ public class TestCaseService {
         response.setUpdatedAt(testCase.getUpdatedAt());
         response.setCreatedBy(testCase.getCreatedBy());
 
-        // Set AI-related fields (default values for now)
-        response.setAi_generated(false);
-        response.setAi_confidence(0.0);
+        // Set AI-related fields
+        response.setModule(testCase.getModule());
+        response.setPreconditions(testCase.getPreconditions());
+        response.setQualityScore(testCase.getQualityScore());
+        response.setAiGenerated(testCase.getAiGenerated() != null ? testCase.getAiGenerated() : false);
+        response.setAiConfidence(testCase.getAiConfidence() != null ? testCase.getAiConfidence() : 0.0f);
 
         return response;
     }

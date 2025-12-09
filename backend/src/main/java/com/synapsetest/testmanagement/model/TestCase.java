@@ -41,6 +41,40 @@ public class TestCase extends BaseEntity {
 
     private String createdBy;
 
+    // ========== AI相关字段 (数据库合并新增) ==========
+
+    /**
+     * 所属模块
+     */
+    @Size(max = 100, message = "Module name must not exceed 100 characters")
+    private String module;
+
+    /**
+     * 前置条件 (JSON数组)
+     */
+    private List<String> preconditions;
+
+    /**
+     * AI质量评分 (0.0-1.0)
+     */
+    @Min(value = 0, message = "Quality score must be at least 0")
+    @Max(value = 1, message = "Quality score must not exceed 1")
+    private Float qualityScore;
+
+    /**
+     * 是否AI生成
+     */
+    private Boolean aiGenerated;
+
+    /**
+     * AI置信度 (0.0-1.0)
+     */
+    @Min(value = 0, message = "AI confidence must be at least 0")
+    @Max(value = 1, message = "AI confidence must not exceed 1")
+    private Float aiConfidence;
+
+    // =================================================
+
     public enum TestCaseType {
         FUNCTIONAL, PERFORMANCE, SECURITY
     }
