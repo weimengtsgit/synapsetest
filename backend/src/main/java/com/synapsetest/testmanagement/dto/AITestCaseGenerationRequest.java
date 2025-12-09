@@ -19,7 +19,13 @@ public class AITestCaseGenerationRequest {
 
     private String testType; // FUNCTIONAL, PERFORMANCE, SECURITY
 
+    private String module; // Module name (e.g., "用户认证", "支付系统")
+
     private List<String> tags; // Optional tags for categorization
 
     private String relatedRequirement; // Link to requirement ID
+
+    private Integer numCases; // Number of test cases to generate (optional)
+
+    private Boolean includeEdgeCases; // Whether to include edge cases (optional)
 }
