@@ -144,21 +144,21 @@
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot2</artifactId>
-            <version>2.0.2</version>
+            <version>1.7.0</version>
         </dependency>
 
         <!-- Resilience4j Retry -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-retry</artifactId>
-            <version>2.0.2</version>
+            <version>1.7.0</version>
         </dependency>
 
         <!-- Resilience4j CircuitBreaker -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-circuitbreaker</artifactId>
-            <version>2.0.2</version>
+            <version>1.7.0</version>
         </dependency>
 
         <!-- Micrometer Prometheus -->
