@@ -52,7 +52,7 @@ mybatis:
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
 server:
-  port: 8080
+  port: 8081
   # No context-path - API versioning is handled in Controllers
 
 # Springdoc OpenAPI (Swagger) Configuration
