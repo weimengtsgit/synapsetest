@@ -328,9 +328,20 @@ public class AIServiceIntegrationTest {
     @Test
     @DisplayName("场景5.1: 测试用例质量分析 - 成功场景")
     void analyzeQuality_Success() throws Exception {
-        // Given: 准备质量分析请求
-        Map<String, Object> request = Map.of(
-                "test_case_ids", Arrays.asList("case-1", "case-2", "case-3")
+        // Given: 准备质量分析请求 (AI Service expects a direct array of test cases)
+        List<Map<String, Object>> testcases = Arrays.asList(
+                Map.of(
+                        "id", "case-1",
+                        "name", "测试用例1",
+                        "steps", Arrays.asList("步骤1", "步骤2"),
+                        "expected_result", "预期结果1"
+                ),
+                Map.of(
+                        "id", "case-2",
+                        "name", "测试用例2",
+                        "steps", Arrays.asList("步骤1"),
+                        "expected_result", "预期结果2"
+                )
         );
 
         Map<String, Object> mockResponse = Map.of(
@@ -348,13 +359,14 @@ public class AIServiceIntegrationTest {
                 )
         );
 
+        // AI Service expects a direct array, not wrapped in an object
         mockServer.expect(requestTo(aiServiceUrl + "/api/v1/ai/testcase/analyze/quality"))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(jsonPath("$.test_case_ids").isArray())
+                .andExpect(jsonPath("$").isArray())
                 .andRespond(withSuccess(objectMapper.writeValueAsString(mockResponse), MediaType.APPLICATION_JSON));
 
         // When: 调用质量分析
-        Map<String, Object> response = aiServiceClient.analyzeQuality(request);
+        Map<String, Object> response = aiServiceClient.analyzeQuality(testcases);
 
         // Then: 验证响应
         assertNotNull(response);

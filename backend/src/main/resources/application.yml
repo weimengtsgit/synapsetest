@@ -87,8 +87,8 @@ services:
   ai-service:
     url: ${AI_SERVICE_URL:http://localhost:8000}
     timeout:
-      connect: 5000  # 5 seconds
-      read: 30000    # 30 seconds
+      connect: 300000  # 300 seconds
+      read: 300000    # 300 seconds
     base-path: /api/v1/ai
 
 management:
