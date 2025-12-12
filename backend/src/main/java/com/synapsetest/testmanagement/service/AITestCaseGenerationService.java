@@ -54,8 +54,8 @@ public class AITestCaseGenerationService {
 
         try {
             // Call AI-Service to generate test cases
-            AITestCaseGenerationResponse aiResponse = aiServiceClient.generateTestCases(request);
-
+//            AITestCaseGenerationResponse aiResponse = aiServiceClient.generateTestCases(request);
+            AITestCaseGenerationResponse aiResponse = null;
             if (!aiResponse.isSuccess() || aiResponse.getGeneratedCases() == null) {
                 log.warn("AI Service returned unsuccessful response, falling back to local generation");
                 return generateTestCasesLocally(request);

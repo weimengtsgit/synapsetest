@@ -373,9 +373,22 @@ public class AIControllerIntegrationTest {
     @Test
     @DisplayName("API场景5.1: POST /ai/testcase/analyze/quality - 质量分析成功")
     void apiAnalyzeQuality_Success() throws Exception {
-        // Given: 准备质量分析请求
+        // Given: 准备质量分析请求 (Backend expects {"testcases": [...]})
         Map<String, Object> requestBody = Map.of(
-                "test_case_ids", Arrays.asList("case-1", "case-2", "case-3")
+                "testcases", Arrays.asList(
+                        Map.of(
+                                "id", "case-1",
+                                "name", "用户登录测试",
+                                "steps", Arrays.asList("打开登录页", "输入用户名密码", "点击登录"),
+                                "expected_result", "成功登录"
+                        ),
+                        Map.of(
+                                "id", "case-2",
+                                "name", "密码错误测试",
+                                "steps", Arrays.asList("打开登录页", "输入错误密码"),
+                                "expected_result", "显示错误提示"
+                        )
+                )
         );
 
         Map<String, Object> mockAiResponse = Map.of(
@@ -404,8 +417,11 @@ public class AIControllerIntegrationTest {
                 )
         );
 
+        // AI Service expects a direct array
         mockServer.expect(requestTo(aiServiceUrl + "/api/v1/ai/testcase/analyze/quality"))
                 .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].id").value("case-1"))
                 .andRespond(withSuccess(objectMapper.writeValueAsString(mockAiResponse), MediaType.APPLICATION_JSON));
 
         HttpHeaders headers = new HttpHeaders();

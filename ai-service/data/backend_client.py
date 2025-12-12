@@ -5,7 +5,7 @@ Handles HTTP communication with Backend service
 import requests
 import logging
 from typing import Optional, Dict, Any
-from config import config
+from config import ai_config
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class BackendAPIClient:
     """
 
     def __init__(self):
-        self.backend_url = config.BACKEND_URL if hasattr(config, 'BACKEND_URL') else 'http://localhost:8080'
+        self.backend_url = ai_config.BACKEND_URL if hasattr(ai_config, 'BACKEND_URL') else 'http://localhost:8080'
         self.timeout = 5  # 5 seconds timeout
 
     def get_environment(self, environment_id: str) -> Optional[Dict[str, Any]]:

@@ -1,7 +1,5 @@
 package com.synapsetest.testmanagement.client;
 
-import com.synapsetest.testmanagement.dto.AITestCaseGenerationRequest;
-import com.synapsetest.testmanagement.dto.ai.*;
 import com.synapsetest.testmanagement.exception.AIServiceException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -18,7 +16,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * AI Service HTTP Client
@@ -54,30 +51,22 @@ public class AIServiceClient {
      */
     @CircuitBreaker(name = "aiService", fallbackMethod = "generateTestCasesFallback")
     @Retry(name = "aiService")
-    public AITestCaseGenerationResponse generateTestCases(AITestCaseGenerationRequest request) {
+    public Map<String, Object> generateTestCases(Map<String, Object> request) {
         String url = buildUrl("/testcase/generate");
 
         log.info("Calling AI Service to generate test cases: {}", url);
 
         try {
-            // Build request body
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("requirement_text", request.getInput());
-            requestBody.put("module", "unknown");
-            requestBody.put("num_cases", 10);
-            requestBody.put("include_edge_cases", true);
+            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(request, createHeaders());
 
-            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(requestBody, createHeaders());
-
-            ResponseEntity<AITestCaseGenerationResponse> response = restTemplate.postForEntity(
+            ResponseEntity<Map> response = restTemplate.postForEntity(
                 url,
                 httpEntity,
-                AITestCaseGenerationResponse.class
+                Map.class
             );
 
-            AITestCaseGenerationResponse result = response.getBody();
-            log.info("AI Service returned {} test cases",
-                result != null ? result.getGeneratedCases().size() : 0);
+            Map<String, Object> result = response.getBody();
+            log.info("AI Service returned response for test case generation");
 
             return result;
 
@@ -90,33 +79,18 @@ public class AIServiceClient {
     /**
      * Batch generate test cases
      *
-     * @param requests List of generation requests
+     * @param request Batch generation request
      * @return Batch generation response
      */
     @CircuitBreaker(name = "aiService", fallbackMethod = "batchGenerateFallback")
     @Retry(name = "aiService")
-    public Map<String, Object> batchGenerate(List<AITestCaseGenerationRequest> requests) {
+    public Map<String, Object> batchGenerate(Map<String, Object> request) {
         String url = buildUrl("/testcase/generate/batch");
 
-        log.info("Calling AI Service to batch generate test cases for {} requirements", requests.size());
+        log.info("Calling AI Service to batch generate test cases");
 
         try {
-            // Build request body
-            List<Map<String, Object>> requirements = requests.stream()
-                .map(req -> {
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("requirement_text", req.getInput());
-                    item.put("module", "unknown");
-                    item.put("num_cases", 5);
-                    item.put("include_edge_cases", true);
-                    return item;
-                })
-                    .collect(Collectors.toList());
-
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("requirements", requirements);
-
-            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(requestBody, createHeaders());
+            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(request, createHeaders());
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
                 url,
@@ -140,18 +114,18 @@ public class AIServiceClient {
      */
     @CircuitBreaker(name = "aiService", fallbackMethod = "deduplicateFallback")
     @Retry(name = "aiService")
-    public DeduplicationResponse deduplicateTestCases(DeduplicationRequest request) {
+    public Map<String, Object> deduplicateTestCases(Map<String, Object> request) {
         String url = buildUrl("/testcase/optimize/deduplicate");
 
-        log.info("Calling AI Service to deduplicate {} test cases", request.getTestcases().size());
+        log.info("Calling AI Service to deduplicate test cases");
 
         try {
-            HttpEntity<DeduplicationRequest> httpEntity = new HttpEntity<>(request, createHeaders());
+            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(request, createHeaders());
 
-            ResponseEntity<DeduplicationResponse> response = restTemplate.postForEntity(
+            ResponseEntity<Map> response = restTemplate.postForEntity(
                 url,
                 httpEntity,
-                DeduplicationResponse.class
+                Map.class
             );
 
             return response.getBody();
@@ -170,18 +144,18 @@ public class AIServiceClient {
      */
     @CircuitBreaker(name = "aiService", fallbackMethod = "prioritizeFallback")
     @Retry(name = "aiService")
-    public PrioritizationResponse prioritizeTestCases(PrioritizationRequest request) {
+    public Map<String, Object> prioritizeTestCases(Map<String, Object> request) {
         String url = buildUrl("/testcase/optimize/prioritize");
 
-        log.info("Calling AI Service to prioritize {} test cases", request.getTestcases().size());
+        log.info("Calling AI Service to prioritize test cases");
 
         try {
-            HttpEntity<PrioritizationRequest> httpEntity = new HttpEntity<>(request, createHeaders());
+            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(request, createHeaders());
 
-            ResponseEntity<PrioritizationResponse> response = restTemplate.postForEntity(
+            ResponseEntity<Map> response = restTemplate.postForEntity(
                 url,
                 httpEntity,
-                PrioritizationResponse.class
+                Map.class
             );
 
             return response.getBody();
@@ -206,10 +180,8 @@ public class AIServiceClient {
         log.info("Calling AI Service to analyze quality of {} test cases", testcases.size());
 
         try {
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("testcases", testcases);
-
-            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(requestBody, createHeaders());
+            // AI Service expects a direct array, not wrapped in an object
+            HttpEntity<List<Map<String, Object>>> httpEntity = new HttpEntity<>(testcases, createHeaders());
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
                 url,
@@ -225,20 +197,145 @@ public class AIServiceClient {
         }
     }
 
+    /**
+     * Submit user feedback for AI-generated test cases
+     *
+     * @param request Feedback request
+     * @return Feedback response
+     */
+    @CircuitBreaker(name = "aiService", fallbackMethod = "submitFeedbackFallback")
+    @Retry(name = "aiService")
+    public Map<String, Object> submitFeedback(Map<String, Object> request) {
+        String url = buildUrl("/testcase/feedback");
+
+        log.info("Calling AI Service to submit feedback");
+
+        try {
+            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(request, createHeaders());
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                url,
+                httpEntity,
+                Map.class
+            );
+
+            Map<String, Object> result = response.getBody();
+            log.info("Feedback submitted successfully");
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("Failed to submit feedback to AI Service: {}", e.getMessage(), e);
+            throw new AIServiceException("Failed to submit feedback", e);
+        }
+    }
+
+    /**
+     * Get AI test strategy recommendation
+     *
+     * @param request Recommendation request containing task context
+     * @return Recommendation response
+     */
+    @CircuitBreaker(name = "aiService", fallbackMethod = "getRecommendationFallback")
+    @Retry(name = "aiService")
+    public Map<String, Object> getRecommendation(Map<String, Object> request) {
+        String url = buildUrl("/recommendation/strategy");
+
+        log.info("Calling AI Service for strategy recommendation");
+
+        try {
+            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(request, createHeaders());
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                url,
+                httpEntity,
+                Map.class
+            );
+
+            Map<String, Object> result = response.getBody();
+            log.info("Strategy recommendation received successfully");
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("Failed to get strategy recommendation: {}", e.getMessage(), e);
+            throw new AIServiceException("Failed to get strategy recommendation", e);
+        }
+    }
+
+    /**
+     * Explain AI recommendation
+     *
+     * @param request Explanation request containing recommendation and context
+     * @return Explanation response
+     */
+    @CircuitBreaker(name = "aiService", fallbackMethod = "explainRecommendationFallback")
+    @Retry(name = "aiService")
+    public Map<String, Object> explainRecommendation(Map<String, Object> request) {
+        String url = buildUrl("/recommendation/strategy/explain");
+
+        log.info("Calling AI Service for recommendation explanation");
+
+        try {
+            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(request, createHeaders());
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                url,
+                httpEntity,
+                Map.class
+            );
+
+            Map<String, Object> result = response.getBody();
+            log.info("Recommendation explanation received successfully");
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("Failed to get recommendation explanation: {}", e.getMessage(), e);
+            throw new AIServiceException("Failed to get recommendation explanation", e);
+        }
+    }
+
+    /**
+     * Check AI Service health
+     *
+     * @return Health status
+     */
+    @CircuitBreaker(name = "aiService", fallbackMethod = "checkHealthFallback")
+    @Retry(name = "aiService")
+    public Map<String, Object> checkHealth() {
+        String url = buildUrl("/testcase/health");
+
+        log.info("Checking AI Service health");
+
+        try {
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+
+            Map<String, Object> result = response.getBody();
+            log.info("AI Service health check successful");
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("AI Service health check failed: {}", e.getMessage(), e);
+            throw new AIServiceException("AI Service health check failed", e);
+        }
+    }
+
     // ==================== Fallback Methods ====================
 
     /**
      * Fallback method for generateTestCases
      */
-    private AITestCaseGenerationResponse generateTestCasesFallback(
-            AITestCaseGenerationRequest request, Exception e) {
+    private Map<String, Object> generateTestCasesFallback(
+            Map<String, Object> request, Exception e) {
         log.warn("AI Service is unavailable, using fallback for test case generation: {}", e.getMessage());
 
-        AITestCaseGenerationResponse response = new AITestCaseGenerationResponse();
-        response.setSuccess(false);
-        response.setMessage("AI服务暂时不可用，请稍后重试或使用手动创建功能");
-        response.setGeneratedCases(Collections.emptyList());
-        response.setConfidenceScore(0.0);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "AI服务暂时不可用，请稍后重试或使用手动创建功能");
+        response.put("generated_cases", Collections.emptyList());
+        response.put("confidence_score", 0.0);
 
         return response;
     }
@@ -247,7 +344,7 @@ public class AIServiceClient {
      * Fallback method for batch generate
      */
     private Map<String, Object> batchGenerateFallback(
-            List<AITestCaseGenerationRequest> requests, Exception e) {
+            Map<String, Object> request, Exception e) {
         log.warn("AI Service is unavailable, using fallback for batch generation: {}", e.getMessage());
 
         Map<String, Object> response = new HashMap<>();
@@ -261,15 +358,15 @@ public class AIServiceClient {
     /**
      * Fallback method for deduplicate
      */
-    private DeduplicationResponse deduplicateFallback(
-            DeduplicationRequest request, Exception e) {
+    private Map<String, Object> deduplicateFallback(
+            Map<String, Object> request, Exception e) {
         log.warn("AI Service is unavailable, using fallback for deduplication: {}", e.getMessage());
 
-        DeduplicationResponse response = new DeduplicationResponse();
-        response.setOptimizedCases(request.getTestcases());
-        response.setDuplicateGroups(Collections.emptyList());
-        response.setReductionRate(0.0);
-        response.setSummary("AI服务不可用，未进行去重");
+        Map<String, Object> response = new HashMap<>();
+        response.put("optimized_cases", request.get("testcases"));
+        response.put("duplicate_groups", Collections.emptyList());
+        response.put("reduction_rate", 0.0);
+        response.put("summary", "AI服务不可用，未进行去重");
 
         return response;
     }
@@ -277,13 +374,13 @@ public class AIServiceClient {
     /**
      * Fallback method for prioritize
      */
-    private PrioritizationResponse prioritizeFallback(
-            PrioritizationRequest request, Exception e) {
+    private Map<String, Object> prioritizeFallback(
+            Map<String, Object> request, Exception e) {
         log.warn("AI Service is unavailable, using fallback for prioritization: {}", e.getMessage());
 
-        PrioritizationResponse response = new PrioritizationResponse();
-        response.setPrioritizedCases(Collections.emptyList());
-        response.setSummary("AI服务不可用，未进行优先级排序");
+        Map<String, Object> response = new HashMap<>();
+        response.put("prioritized_cases", Collections.emptyList());
+        response.put("summary", "AI服务不可用，未进行优先级排序");
 
         return response;
     }
@@ -302,6 +399,87 @@ public class AIServiceClient {
         response.put("message", "AI服务不可用，无法进行质量分析");
 
         return response;
+    }
+
+    /**
+     * Fallback method for feedback submission
+     */
+    private Map<String, Object> submitFeedbackFallback(
+            Map<String, Object> request, Exception e) {
+        log.warn("AI Service is unavailable, using fallback for feedback submission: {}", e.getMessage());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "AI服务暂时不可用，反馈提交失败，请稍后重试");
+        response.put("request_id", request.get("request_id"));
+
+        return response;
+    }
+
+    /**
+     * Fallback method for strategy recommendation
+     */
+    private Map<String, Object> getRecommendationFallback(
+            Map<String, Object> request, Exception e) {
+        log.warn("AI Service is unavailable, using fallback for strategy recommendation: {}", e.getMessage());
+
+        Map<String, Object> fallbackRecommendation = new HashMap<>();
+        fallbackRecommendation.put("task_id", request.get("task_id"));
+
+        Map<String, Object> recommendation = new HashMap<>();
+        recommendation.put("test_scope", "CORE");
+        recommendation.put("environment", "STAGING");
+        recommendation.put("priority", 5);
+        recommendation.put("estimated_duration", 60);
+        recommendation.put("risk_level", "MEDIUM");
+        fallbackRecommendation.put("recommendation", recommendation);
+
+        Map<String, Object> riskAssessment = new HashMap<>();
+        riskAssessment.put("risk_level", "MEDIUM");
+        riskAssessment.put("risk_factors", Collections.emptyList());
+        fallbackRecommendation.put("risk_assessment", riskAssessment);
+
+        fallbackRecommendation.put("environment_recommendations", Collections.emptyList());
+        fallbackRecommendation.put("message", "AI服务暂时不可用，返回默认推荐策略");
+
+        return fallbackRecommendation;
+    }
+
+    /**
+     * Fallback method for recommendation explanation
+     */
+    private Map<String, Object> explainRecommendationFallback(
+            Map<String, Object> request, Exception e) {
+        log.warn("AI Service is unavailable, using fallback for recommendation explanation: {}", e.getMessage());
+
+        Map<String, Object> fallbackExplanation = new HashMap<>();
+        fallbackExplanation.put("success", false);
+
+        Map<String, Object> explanation = new HashMap<>();
+        explanation.put("summary", "AI服务暂时不可用，无法生成详细解释");
+        explanation.put("key_factors", Collections.emptyList());
+        explanation.put("confidence_level", 0.0);
+        explanation.put("alternatives", Collections.emptyList());
+        fallbackExplanation.put("explanation", explanation);
+
+        fallbackExplanation.put("message", "AI服务暂时不可用");
+
+        return fallbackExplanation;
+    }
+
+    /**
+     * Fallback method for health check
+     */
+    private Map<String, Object> checkHealthFallback(Exception e) {
+        log.warn("AI Service health check failed: {}", e.getMessage());
+
+        Map<String, Object> health = new HashMap<>();
+        health.put("status", "DOWN");
+        health.put("ai_service_url", aiServiceUrl);
+        health.put("message", "AI Service is unavailable: " + e.getMessage());
+        health.put("error", e.getClass().getSimpleName());
+
+        return health;
     }
 
     // ==================== Helper Methods ====================
