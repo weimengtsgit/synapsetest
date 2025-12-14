@@ -203,7 +203,14 @@ public class TestCaseService {
         for (Map<String, Object> tcMap : testCaseMaps) {
             TestCase testCase = new TestCase();
             testCase.setId(UUID.randomUUID().toString());
-            testCase.setTitle((String) tcMap.get("case_name"));
+
+            // Support both "title" and "case_name"
+            String title = (String) tcMap.get("title");
+            if (title == null) {
+                title = (String) tcMap.get("case_name");
+            }
+            testCase.setTitle(title);
+
             testCase.setDescription((String) tcMap.getOrDefault("description", ""));
 
             // Parse steps - could be a List or a String
@@ -215,8 +222,11 @@ public class TestCaseService {
                 testCase.setSteps(Collections.singletonList((String) stepsObj));
             }
 
-            // Parse expected_result - could be a Map or a String
-            Object expectedResultObj = tcMap.get("expected_result");
+            // Parse expected_result - support both "expectedResult" and "expected_result"
+            Object expectedResultObj = tcMap.get("expectedResult");
+            if (expectedResultObj == null) {
+                expectedResultObj = tcMap.get("expected_result");
+            }
             if (expectedResultObj instanceof Map) {
                 testCase.setExpectedResult(expectedResultObj.toString());
             } else if (expectedResultObj instanceof String) {
@@ -248,7 +258,23 @@ public class TestCaseService {
 
             testCase.setType((String) tcMap.get("type"));
             testCase.setStatus(TestCase.TestCaseStatus.DRAFT.name());
-            testCase.setTags(Collections.emptyList());
+
+            // Parse tags - support List
+            Object tagsObj = tcMap.get("tags");
+            if (tagsObj instanceof List) {
+                testCase.setTags((List<String>) tagsObj);
+            } else {
+                testCase.setTags(Collections.emptyList());
+            }
+
+            // Set module and preconditions
+            testCase.setModule((String) tcMap.get("module"));
+
+            Object preconditionsObj = tcMap.get("preconditions");
+            if (preconditionsObj instanceof List) {
+                testCase.setPreconditions((List<String>) preconditionsObj);
+            }
+
             testCase.setRelatedRequirement((String) tcMap.getOrDefault("module", ""));
             testCase.setCreatedBy(userId);
             testCase.setCreatedAt(LocalDateTime.now());

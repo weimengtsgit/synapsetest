@@ -84,7 +84,7 @@ public class TestCaseController {
             responseCode = "201",
             description = "批量创建成功"
     )
-    @PostMapping("≈")
+    @PostMapping("/batch")
     public ResponseEntity<Map<String, Object>> batchSaveTestCases(
             @Parameter(description = "批量测试用例请求", required = true)
             @RequestBody Map<String, List<Map<String, Object>>> request,
@@ -126,7 +126,7 @@ public class TestCaseController {
      */
     @Operation(summary = "获取测试用例列表", description = "获取系统中所有的测试用例列表或按条件筛选")
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllTestCases(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAllTestCases(
             @Parameter(description = "是否AI生成", required = false)
             @RequestParam(required = false) Boolean ai_generated,
             @Parameter(description = "模块名称", required = false)
@@ -143,12 +143,12 @@ public class TestCaseController {
             testCases = testCaseService.getAllTestCases();
         }
 
-        Map<String, Object> response = Map.of(
+        Map<String, Object> data = Map.of(
                 "content", testCases,
                 "total", testCases.size()
         );
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     /**
@@ -211,8 +211,8 @@ public class TestCaseController {
      * Note: AI quality analysis has been moved to /api/v1/ai/testcase/analyze/quality
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTestCase(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Void>> deleteTestCase(@PathVariable String id) {
         testCaseService.deleteTestCase(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Test case deleted successfully", null));
     }
 }

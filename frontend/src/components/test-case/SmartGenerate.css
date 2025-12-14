@@ -1,0 +1,141 @@
+.smart-generate-container {
+  padding: 24px;
+  background: #f0f2f5;
+  min-height: calc(100vh - 64px);
+}
+
+.smart-generate-container h2 {
+  color: #1890ff;
+  font-weight: bold;
+}
+
+.steps-container {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.step-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* 成功提示 */
+.success-alert {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  padding: 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.success-title {
+  color: #52c41a;
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.success-details {
+  font-size: 12px;
+  color: #595959;
+  line-height: 1.8;
+}
+
+/* 测试用例列表 */
+.testcase-list {
+  margin-top: 16px;
+}
+
+.testcase-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: white;
+  transition: all 0.3s;
+}
+
+.testcase-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.testcase-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.testcase-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.testcase-name {
+  flex: 1;
+}
+
+.testcase-details {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.testcase-section {
+  margin-bottom: 16px;
+}
+
+.section-label {
+  font-weight: bold;
+  color: #1890ff;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.section-content {
+  color: #595959;
+  line-height: 1.8;
+}
+
+.section-content ul,
+.section-content ol {
+  margin-left: 20px;
+  padding-left: 0;
+}
+
+.section-content li {
+  margin-bottom: 8px;
+}
+
+.section-content li div {
+  margin-bottom: 4px;
+}
+
+.section-content strong {
+  color: #262626;
+  font-weight: 500;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .smart-generate-container {
+    padding: 16px;
+  }
+
+  .testcase-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .testcase-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
