@@ -27,6 +27,7 @@ import TestEnvironmentList from './components/test-environment/TestEnvironmentLi
 import WorkbenchDashboard from './components/workbench/WorkbenchDashboard'
 import BatchGenerate from './components/test-case/BatchGenerate'
 import StrategyRecommendation from './components/recommendation/StrategyRecommendation'
+import AppHeader from './components/layout/AppHeader'
 
 const { Header, Content, Footer, Sider } = Layout
 
@@ -120,79 +121,58 @@ const App: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={(value) => setCollapsed(value)}
-        theme="dark"
-      >
-        <div
-          style={{
-            height: '32px',
-            margin: '16px',
-            background: 'rgba(255, 255, 255, 0.2)',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold',
-          }}
-        >
-          {!collapsed ? 'SynapseTest' : 'ST'}
-        </div>
-        <Menu
+      {/* 顶部导航栏 */}
+      <AppHeader username="张三" projectName="电商系统" notificationCount={3} />
+
+      <Layout style={{ marginTop: '64px' }}>
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={(value) => setCollapsed(value)}
           theme="dark"
-          mode="inline"
-          defaultSelectedKeys={['/']}
-          items={menuItems}
-        />
-      </Sider>
-      <Layout>
-        <Header style={{ padding: 0, background: '#fff' }}>
-          <div
-            style={{
-              padding: '0 24px',
-              fontSize: '20px',
-              fontWeight: 'bold',
-              color: '#1890ff',
-            }}
-          >
-            AI驱动测试任务管理系统 (AI-Driven Test Management System)
-          </div>
-        </Header>
-        <Content style={{ margin: '0', background: '#f0f2f5' }}>
-          <Routes>
-            {/* Workbench Dashboard as Home */}
-            <Route path="/" element={<WorkbenchDashboard />} />
+        >
+          <Menu
+            theme="dark"
+            mode="inline"
+            defaultSelectedKeys={['/']}
+            items={menuItems}
+            style={{ marginTop: '16px' }}
+          />
+        </Sider>
+        <Layout>
+          <Content style={{ margin: '0', background: '#f0f2f5' }}>
+            <Routes>
+              {/* Workbench Dashboard as Home */}
+              <Route path="/" element={<WorkbenchDashboard />} />
 
-            {/* Test Cases */}
-            <Route path="/test-cases/generate" element={<AITestCaseGeneration />} />
-            <Route path="/test-cases/batch-generate" element={<BatchGenerate />} />
-            <Route path="/test-cases/list" element={<TestCaseList />} />
+              {/* Test Cases */}
+              <Route path="/test-cases/generate" element={<AITestCaseGeneration />} />
+              <Route path="/test-cases/batch-generate" element={<BatchGenerate />} />
+              <Route path="/test-cases/list" element={<TestCaseList />} />
 
-            {/* AI Recommendation */}
-            <Route path="/recommendation/strategy" element={<StrategyRecommendation />} />
+              {/* AI Recommendation */}
+              <Route path="/recommendation/strategy" element={<StrategyRecommendation />} />
 
-            {/* Test Tasks */}
-            <Route path="/test-tasks/create" element={<CreateTestTask />} />
-            <Route path="/test-tasks/list" element={<TestTaskList />} />
+              {/* Test Tasks */}
+              <Route path="/test-tasks/create" element={<CreateTestTask />} />
+              <Route path="/test-tasks/list" element={<TestTaskList />} />
 
-            {/* Monitoring & Reports */}
-            <Route path="/monitoring/dashboard" element={<Dashboard />} />
-            <Route
-              path="/reports/quality"
-              element={<QualityReport taskId={selectedTaskId} />}
-            />
+              {/* Monitoring & Reports */}
+              <Route path="/monitoring/dashboard" element={<Dashboard />} />
+              <Route
+                path="/reports/quality"
+                element={<QualityReport taskId={selectedTaskId} />}
+              />
 
-            {/* Configuration */}
-            <Route path="/config/versions" element={<TestVersionList />} />
-            <Route path="/config/environments" element={<TestEnvironmentList />} />
-          </Routes>
-        </Content>
-        <Footer style={{ textAlign: 'center', background: '#f0f2f5' }}>
-          AI Test Management System ©2025 Created by SynapseTest Team
-        </Footer>
+              {/* Configuration */}
+              <Route path="/config/versions" element={<TestVersionList />} />
+              <Route path="/config/environments" element={<TestEnvironmentList />} />
+            </Routes>
+          </Content>
+          <Footer style={{ textAlign: 'center', background: '#f0f2f5' }}>
+            AI Test Management System ©2025 Created by SynapseTest Team
+          </Footer>
+        </Layout>
       </Layout>
     </Layout>
   )
