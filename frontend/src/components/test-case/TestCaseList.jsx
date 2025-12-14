@@ -369,7 +369,7 @@ const TestCaseList = () => {
 
             <div style={{ marginTop: 24 }}>
               <h4>预期结果:</h4>
-              <p>{selectedTestCase.expectedResults || '无预期结果'}</p>
+              <p>{selectedTestCase.expectedResult || '无预期结果'}</p>
             </div>
           </div>
         )}

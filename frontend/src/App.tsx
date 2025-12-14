@@ -28,6 +28,7 @@ import WorkbenchDashboard from './components/workbench/WorkbenchDashboard'
 import BatchGenerate from './components/test-case/BatchGenerate'
 import StrategyRecommendation from './components/recommendation/StrategyRecommendation'
 import AppHeader from './components/layout/AppHeader'
+import SmartGenerate from './components/test-case/SmartGenerate'
 
 const { Header, Content, Footer, Sider } = Layout
 
@@ -47,6 +48,10 @@ const App: React.FC = () => {
       icon: <FileTextOutlined />,
       label: '测试用例 (Test Cases)',
       children: [
+        {
+          key: '/test-cases/smart-generate',
+          label: <Link to="/test-cases/smart-generate">智能生成 (Smart Generate)</Link>,
+        },
         {
           key: '/test-cases/generate',
           label: <Link to="/test-cases/generate">AI生成 (AI Generate)</Link>,
@@ -146,6 +151,7 @@ const App: React.FC = () => {
               <Route path="/" element={<WorkbenchDashboard />} />
 
               {/* Test Cases */}
+              <Route path="/test-cases/smart-generate" element={<SmartGenerate />} />
               <Route path="/test-cases/generate" element={<AITestCaseGeneration />} />
               <Route path="/test-cases/batch-generate" element={<BatchGenerate />} />
               <Route path="/test-cases/list" element={<TestCaseList />} />
