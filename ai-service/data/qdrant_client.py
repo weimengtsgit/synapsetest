@@ -258,7 +258,7 @@ class QdrantClient(VectorDBInterface):
             # Generate embedding
             embedding = self.embed_text(text)
             
-            # Create point with payload
+            # Create point with payload - store all available fields
             point = PointStruct(
                 id=str(uuid.uuid4()),  # Qdrant uses UUID for point IDs
                 vector=embedding,
@@ -266,7 +266,14 @@ class QdrantClient(VectorDBInterface):
                     'testcase_id': testcase_id,
                     'module': testcase_data.get('module', 'unknown'),
                     'priority': testcase_data.get('priority', 'P2'),
-                    'type': testcase_data.get('type', '功能测试')
+                    'type': testcase_data.get('type', '功能测试'),
+                    'name': testcase_data.get('name', ''),
+                    'description': testcase_data.get('description', ''),
+                    'steps': testcase_data.get('steps', []),
+                    'preconditions': testcase_data.get('preconditions', []),
+                    'tags': testcase_data.get('tags', []),
+                    'request_id': testcase_data.get('request_id', ''),
+                    'generated_at': testcase_data.get('generated_at', '')
                 }
             )
             
@@ -325,7 +332,14 @@ class QdrantClient(VectorDBInterface):
                         'testcase_id': testcase_id,
                         'module': tc.get('module', 'unknown'),
                         'priority': tc.get('priority', 'P2'),
-                        'type': tc.get('type', '功能测试')
+                        'type': tc.get('type', '功能测试'),
+                        'name': tc.get('name', ''),
+                        'description': tc.get('description', ''),
+                        'steps': tc.get('steps', []),
+                        'preconditions': tc.get('preconditions', []),
+                        'tags': tc.get('tags', []),
+                        'request_id': tc.get('request_id', ''),
+                        'generated_at': tc.get('generated_at', '')
                     }
                 )
                 points.append(point)
@@ -508,24 +522,104 @@ class QdrantClient(VectorDBInterface):
     def clear_collection(self) -> bool:
         """
         Clear all test cases from Qdrant (use with caution!)
-        
+
         Returns:
             Success status
         """
         if not self._client:
             return False
-        
+
         try:
             # Delete and recreate collection
             self._client.delete_collection(self.COLLECTION_NAME)
             self._init_collection()
-            
+
             logger.warning("Cleared all test cases from Qdrant")
             return True
         except Exception as e:
             logger.error(f"Failed to clear collection: {e}")
             return False
-    
+
+    def scroll_testcases(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        module_filter: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Scroll through test cases in the vector database
+
+        Args:
+            limit: Number of records to return
+            offset: Number of records to skip
+            module_filter: Optional module name to filter results
+
+        Returns:
+            Dictionary containing total and records
+        """
+        if not self._client:
+            logger.warning("Qdrant not available, returning empty results")
+            return {'total': 0, 'records': []}
+
+        try:
+            # Build filter
+            scroll_filter = None
+            if module_filter:
+                scroll_filter = Filter(
+                    must=[
+                        FieldCondition(
+                            key="module",
+                            match=MatchValue(value=module_filter)
+                        )
+                    ]
+                )
+
+            # Use scroll API to get all records
+            # Qdrant scroll returns records in batches
+            all_points = []
+            scroll_result = self._client.scroll(
+                collection_name=self.COLLECTION_NAME,
+                scroll_filter=scroll_filter,
+                limit=limit + offset,  # Get enough to handle offset
+                with_payload=True,
+                with_vectors=False  # Don't need vectors for history display
+            )
+
+            all_points = scroll_result[0]  # First element is the list of points
+
+            # Apply offset and limit
+            total_count = len(all_points)
+            paginated_points = all_points[offset:offset + limit]
+
+            # Format results with all available fields
+            records = []
+            for point in paginated_points:
+                payload = point.payload
+                records.append({
+                    'id': payload.get('testcase_id'),
+                    'testcase_id': payload.get('testcase_id'),
+                    'module': payload.get('module'),
+                    'priority': payload.get('priority'),
+                    'type': payload.get('type'),
+                    'name': payload.get('name', ''),
+                    'description': payload.get('description', ''),
+                    'steps': payload.get('steps', []),
+                    'preconditions': payload.get('preconditions', []),
+                    'tags': payload.get('tags', []),
+                    'request_id': payload.get('request_id', ''),
+                    'generated_at': payload.get('generated_at', '')
+                })
+
+            logger.info(f"Scrolled {len(records)} test cases from Qdrant (total: {total_count})")
+            return {
+                'total': total_count,
+                'records': records
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to scroll test cases: {e}")
+            return {'total': 0, 'records': []}
+
     def close(self):
         """Close Qdrant connection"""
         try:

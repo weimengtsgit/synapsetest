@@ -153,6 +153,28 @@ class VectorDBInterface(ABC):
         pass
     
     @abstractmethod
+    def scroll_testcases(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        module_filter: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Scroll through test cases in the vector database
+
+        Args:
+            limit: Number of records to return
+            offset: Number of records to skip
+            module_filter: Optional module name to filter results
+
+        Returns:
+            Dictionary containing:
+            - total: Total number of matching records
+            - records: List of test case records
+        """
+        pass
+
+    @abstractmethod
     def close(self):
         """Close vector database connection"""
         pass

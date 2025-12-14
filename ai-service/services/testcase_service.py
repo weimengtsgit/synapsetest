@@ -392,6 +392,73 @@ class TestCaseGenerationService:
 
         return " | ".join(description_parts)
 
+    def get_generation_history(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        module: str = None
+    ) -> Dict[str, Any]:
+        """
+        Get test case generation history from vector database
+
+        Args:
+            limit: Number of records to return
+            offset: Number of records to skip
+            module: Filter by module name (optional)
+
+        Returns:
+            History records with pagination info
+        """
+        try:
+            logger.info(f"Fetching generation history: limit={limit}, offset={offset}, module={module}")
+
+            # Use scroll_testcases to get records from vector database
+            scroll_result = vector_db_client.scroll_testcases(
+                limit=limit,
+                offset=offset,
+                module_filter=module
+            )
+
+            total_count = scroll_result.get('total', 0)
+            records = scroll_result.get('records', [])
+
+            # Format results for response
+            history_records = []
+            for record in records:
+                history_records.append({
+                    'id': record.get('testcase_id', record.get('id')),
+                    'request_id': record.get('request_id', ''),
+                    'module': record.get('module', ''),
+                    'testcase_name': record.get('name', ''),
+                    'type': record.get('type', ''),
+                    'priority': record.get('priority', ''),
+                    'tags': record.get('tags', []),
+                    'generated_at': record.get('generated_at', ''),
+                    'description': record.get('description', ''),
+                    'steps': record.get('steps', []),
+                    'preconditions': record.get('preconditions', []),
+                })
+
+            result = {
+                'success': True,
+                'total': total_count,
+                'limit': limit,
+                'offset': offset,
+                'records': history_records
+            }
+
+            logger.info(f"Retrieved {len(history_records)} history records (total: {total_count})")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to fetch generation history: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': str(e),
+                'total': 0,
+                'records': []
+            }
+
 
 class TestCaseOptimizationService:
     """

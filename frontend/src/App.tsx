@@ -29,6 +29,7 @@ import BatchGenerate from './components/test-case/BatchGenerate'
 import StrategyRecommendation from './components/recommendation/StrategyRecommendation'
 import AppHeader from './components/layout/AppHeader'
 import SmartGenerate from './components/test-case/SmartGenerate'
+import GenerationHistory from './components/test-case/GenerationHistory'
 
 const { Header, Content, Footer, Sider } = Layout
 
@@ -55,6 +56,10 @@ const App: React.FC = () => {
         {
           key: '/test-cases/batch-generate',
           label: <Link to="/test-cases/batch-generate">批量生成 (Batch Generate)</Link>,
+        },
+        {
+          key: '/test-cases/history',
+          label: <Link to="/test-cases/history">生成历史 (History)</Link>,
         },
         {
           key: '/test-cases/list',
@@ -150,6 +155,7 @@ const App: React.FC = () => {
               <Route path="/test-cases/smart-generate" element={<SmartGenerate />} />
               <Route path="/test-cases/generate" element={<AITestCaseGeneration />} />
               <Route path="/test-cases/batch-generate" element={<BatchGenerate />} />
+              <Route path="/test-cases/history" element={<GenerationHistory />} />
               <Route path="/test-cases/list" element={<TestCaseList />} />
 
               {/* AI Recommendation */}
