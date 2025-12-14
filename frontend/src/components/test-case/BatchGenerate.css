@@ -1,0 +1,35 @@
+.batch-generate-container {
+  padding: 24px;
+  background: #f0f2f5;
+  min-height: calc(100vh - 64px);
+}
+
+.batch-generate-container h2 {
+  color: #1890ff;
+  font-weight: bold;
+}
+
+.batch-generate-container .ant-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+.batch-generate-container .ant-upload-drag {
+  border-radius: 8px;
+}
+
+.batch-generate-container .ant-upload-drag-icon {
+  font-size: 48px;
+  color: #1890ff;
+}
+
+.batch-generate-container .ant-upload-text {
+  color: #1890ff;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.batch-generate-container .ant-upload-hint {
+  color: #8c8c8c;
+  font-size: 12px;
+}

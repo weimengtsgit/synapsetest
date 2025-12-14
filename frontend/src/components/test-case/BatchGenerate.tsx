@@ -1,397 +1,576 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 import {
-  Form,
-  Input,
+  Card,
   Button,
-  Upload,
   Table,
   message,
-  Card,
-  InputNumber,
-  Space,
-  Checkbox,
-  Tag,
+  Upload,
   Modal,
-  Spin,
-} from 'antd';
+  Form,
+  Input,
+  InputNumber,
+  Checkbox,
+  Space,
+  Popconfirm,
+} from 'antd'
 import {
   UploadOutlined,
-  PlusOutlined,
   DeleteOutlined,
-  ThunderboltOutlined,
-} from '@ant-design/icons';
-import aiService, { AIGenerationRequest } from '../../services/aiService';
+  EditOutlined,
+  PlusOutlined,
+  InboxOutlined,
+} from '@ant-design/icons'
+import type { UploadProps } from 'antd'
+import * as XLSX from 'xlsx'
+import axios from 'axios'
+import './BatchGenerate.css'
 
-const { TextArea } = Input;
+const { Dragger } = Upload
 
 interface Requirement {
-  id: number;
-  module: string;
-  requirement: string;
+  key: number
+  moduleName: string
+  system: string
+  numCases: number
+  requirementText?: string
 }
 
 /**
- * Batch Generate Test Cases
- * Allows users to generate test cases for multiple requirements at once
- *
- * Features:
- * - Upload requirements from Excel/CSV
- * - Manually add requirements
- * - Configure generation settings
- * - View and manage results
+ * 批量测试用例生成组件
+ * 参考 frontend/docs/UI原型演示.html 中的批量生成页面设计
  */
 const BatchGenerate: React.FC = () => {
-  const [form] = Form.useForm();
-  const [requirements, setRequirements] = useState<Requirement[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<any>(null);
-  const [nextId, setNextId] = useState(1);
+  const [requirements, setRequirements] = useState<Requirement[]>([])
+  const [nextKey, setNextKey] = useState(1)
+  const [addModalVisible, setAddModalVisible] = useState(false)
+  const [editModalVisible, setEditModalVisible] = useState(false)
+  const [currentRequirement, setCurrentRequirement] = useState<Requirement | null>(null)
+  const [form] = Form.useForm()
 
-  /**
-   * Handle file upload
-   */
-  const handleUpload = (file: File) => {
-    message.info('文件上传功能正在开发中，请先手动添加需求');
-    // TODO: Parse Excel/CSV file and extract requirements
-    return false;  // Prevent automatic upload
-  };
+  // 配置参数
+  const [applyAdvanced, setApplyAdvanced] = useState(true)
+  const [autoDeduplicate, setAutoDeduplicate] = useState(true)
+  const [prioritySort, setPrioritySort] = useState(true)
+  const [maxCases, setMaxCases] = useState(100)
+  const [loading, setLoading] = useState(false)
 
-  /**
-   * Add a new empty requirement
-   */
-  const handleAddRequirement = () => {
-    setRequirements([
-      ...requirements,
-      {
-        id: nextId,
-        module: '',
-        requirement: '',
-      },
-    ]);
-    setNextId(nextId + 1);
-  };
+  // 文件上传配置
+  const uploadProps: UploadProps = {
+    name: 'file',
+    multiple: false,
+    accept: '.xlsx,.xls',
+    beforeUpload: (file) => {
+      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                      file.type === 'application/vnd.ms-excel'
+      if (!isExcel) {
+        message.error('只能上传 .xlsx 或 .xls 格式的文件!')
+        return false
+      }
 
-  /**
-   * Update requirement field
-   */
-  const handleUpdateRequirement = (id: number, field: keyof Requirement, value: string) => {
-    setRequirements(requirements.map(req =>
-      req.id === id ? { ...req, [field]: value } : req
-    ));
-  };
+      // 解析Excel文件
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result
+          const workbook = XLSX.read(data, { type: 'binary' })
 
-  /**
-   * Remove requirement
-   */
-  const handleRemoveRequirement = (id: number) => {
-    setRequirements(requirements.filter(req => req.id !== id));
-  };
+          // 读取第一个sheet
+          const firstSheetName = workbook.SheetNames[0]
+          const worksheet = workbook.Sheets[firstSheetName]
 
-  /**
-   * Batch generate test cases
-   */
-  const handleBatchGenerate = async (values: any) => {
-    if (requirements.length === 0) {
-      message.warning('请先添加需求');
-      return;
-    }
+          // 转换为JSON
+          const jsonData = XLSX.utils.sheet_to_json(worksheet)
 
-    // Validate all requirements have content
-    const invalidReqs = requirements.filter(req => !req.requirement.trim());
-    if (invalidReqs.length > 0) {
-      message.error('所有需求必须填写内容');
-      return;
-    }
+          if (jsonData.length === 0) {
+            message.warning('Excel文件中没有数据')
+            return
+          }
 
-    setLoading(true);
+          // 解析数据并添加到需求列表
+          const newRequirements: Requirement[] = []
+          let currentKey = nextKey
 
+          jsonData.forEach((row: any) => {
+            const moduleName = row['模块名称'] || row['moduleName']
+            const system = row['所属系统'] || row['system']
+            const numCases = row['生成数量'] || row['numCases'] || 10
+
+            if (moduleName && system) {
+              newRequirements.push({
+                key: currentKey++,
+                moduleName: String(moduleName),
+                system: String(system),
+                numCases: Number(numCases),
+              })
+            }
+          })
+
+          if (newRequirements.length === 0) {
+            message.warning('未能从Excel中解析出有效数据，请检查文件格式')
+            return
+          }
+
+          setRequirements([...requirements, ...newRequirements])
+          setNextKey(currentKey)
+          message.success(`成功导入 ${newRequirements.length} 条需求`)
+        } catch (error: any) {
+          console.error('解析Excel文件失败:', error)
+          message.error('解析Excel文件失败: ' + error.message)
+        }
+      }
+
+      reader.readAsBinaryString(file)
+      return false  // 阻止自动上传
+    },
+    onChange(info) {
+      const { status } = info.file
+      if (status === 'done') {
+        message.success(`${info.file.name} 文件上传成功`)
+      } else if (status === 'error') {
+        message.error(`${info.file.name} 文件上传失败`)
+      }
+    },
+  }
+
+  // 下载模板
+  const handleDownloadTemplate = () => {
     try {
-      // Build batch request
-      const requests: AIGenerationRequest[] = requirements.map(req => ({
-        input: req.requirement,
-        testType: 'FUNCTIONAL',
-        tags: req.module ? [req.module] : [],
-      }));
+      // 创建模板数据
+      const templateData = [
+        {
+          '模块名称': '用户登录模块',
+          '所属系统': '用户认证',
+          '生成数量': 10,
+        },
+        {
+          '模块名称': '支付功能模块',
+          '所属系统': '支付系统',
+          '生成数量': 15,
+        },
+        {
+          '模块名称': '订单管理模块',
+          '所属系统': '订单中心',
+          '生成数量': 12,
+        },
+      ]
 
-      const response = await aiService.batchGenerate({ requests });
+      // 创建工作簿
+      const worksheet = XLSX.utils.json_to_sheet(templateData)
 
-      setResults(response);
+      // 设置列宽
+      worksheet['!cols'] = [
+        { wch: 20 }, // 模块名称
+        { wch: 15 }, // 所属系统
+        { wch: 12 }, // 生成数量
+      ]
 
-      message.success(
-        `批量生成完成！共生成 ${response.total_cases || response.results?.length || 0} 条用例`
-      );
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, '批量生成模板')
 
+      // 添加说明sheet
+      const instructionData = [
+        { '说明': '本模板用于批量生成测试用例' },
+        { '说明': '' },
+        { '说明': '字段说明：' },
+        { '说明': '1. 模块名称：必填，测试模块的名称，如"用户登录模块"' },
+        { '说明': '2. 所属系统：必填，模块所属的系统名称，如"用户认证"' },
+        { '说明': '3. 生成数量：必填，需要生成的测试用例数量（1-50）' },
+        { '说明': '' },
+        { '说明': '使用方法：' },
+        { '说明': '1. 请参考示例数据填写您的需求' },
+        { '说明': '2. 可以删除示例数据，添加您自己的需求' },
+        { '说明': '3. 填写完成后保存文件' },
+        { '说明': '4. 在批量生成页面上传该文件' },
+      ]
+      const instructionSheet = XLSX.utils.json_to_sheet(instructionData)
+      instructionSheet['!cols'] = [{ wch: 60 }]
+      XLSX.utils.book_append_sheet(workbook, instructionSheet, '使用说明')
+
+      // 生成Excel文件并下载
+      XLSX.writeFile(workbook, '测试用例批量生成模板.xlsx')
+
+      message.success('模板下载成功')
     } catch (error: any) {
-      message.error(`批量生成失败: ${error.message}`);
-      console.error('Batch generation error:', error);
-    } finally {
-      setLoading(false);
+      console.error('模板下载失败:', error)
+      message.error('模板下载失败: ' + error.message)
     }
-  };
+  }
 
-  /**
-   * Clear all requirements
-   */
-  const handleClear = () => {
-    Modal.confirm({
-      title: '确认清空',
-      content: '确定要清空所有需求吗？',
-      onOk: () => {
-        setRequirements([]);
-        setResults(null);
-      },
-    });
-  };
+  // 使用示例
+  const handleUseExample = () => {
+    const examples: Requirement[] = [
+      { key: nextKey, moduleName: '用户登录模块', system: '用户认证', numCases: 10 },
+      { key: nextKey + 1, moduleName: '支付功能模块', system: '支付系统', numCases: 15 },
+      { key: nextKey + 2, moduleName: '订单管理模块', system: '订单中心', numCases: 12 },
+    ]
+    setRequirements(examples)
+    setNextKey(nextKey + 3)
+    message.success('已加载示例数据')
+  }
 
-  /**
-   * Requirement table columns
-   */
-  const requirementColumns = [
+  // 打开添加需求弹窗
+  const handleOpenAddModal = () => {
+    form.resetFields()
+    setAddModalVisible(true)
+  }
+
+  // 添加需求
+  const handleAddRequirement = () => {
+    form.validateFields().then((values) => {
+      const newRequirement: Requirement = {
+        key: nextKey,
+        moduleName: values.moduleName,
+        system: values.system,
+        numCases: values.numCases || 10,
+      }
+      setRequirements([...requirements, newRequirement])
+      setNextKey(nextKey + 1)
+      setAddModalVisible(false)
+      message.success('需求添加成功')
+    })
+  }
+
+  // 打开编辑需求弹窗
+  const handleOpenEditModal = (record: Requirement) => {
+    setCurrentRequirement(record)
+    form.setFieldsValue(record)
+    setEditModalVisible(true)
+  }
+
+  // 编辑需求
+  const handleEditRequirement = () => {
+    form.validateFields().then((values) => {
+      setRequirements(requirements.map(req =>
+        req.key === currentRequirement?.key
+          ? { ...req, ...values }
+          : req
+      ))
+      setEditModalVisible(false)
+      message.success('需求更新成功')
+    })
+  }
+
+  // 删除需求
+  const handleDeleteRequirement = (key: number) => {
+    setRequirements(requirements.filter(req => req.key !== key))
+    message.success('需求删除成功')
+  }
+
+  // 全部删除
+  const handleDeleteAll = () => {
+    setRequirements([])
+    message.success('已清空所有需求')
+  }
+
+  // 开始批量生成
+  const handleBatchGenerate = async () => {
+    if (requirements.length === 0) {
+      message.warning('请至少添加一个需求')
+      return
+    }
+
+    setLoading(true)
+    try {
+      // 构建批量生成请求参数
+      const batchRequest = {
+        requirements: requirements.map((req) => ({
+          requirement_text: req.requirementText || `${req.system} - ${req.moduleName}的功能需求`,
+          module: req.moduleName,
+          num_cases: req.numCases,
+          include_edge_cases: true,
+          optimization: applyAdvanced ? {
+            deduplicate: autoDeduplicate,
+            prioritize: prioritySort,
+            min_priority: null,
+            max_cases: maxCases,
+          } : null,
+        })),
+      }
+
+      console.log('批量生成请求:', batchRequest)
+
+      // 调用后端接口
+      const response = await axios.post('/api/v1/ai/testcase/generate/batch', batchRequest)
+
+      console.log('批量生成响应:', response.data)
+
+      // 后端返回格式: { success: true, data: { success: true, total_requests: 3, successful: 3, failed: 0, results: [...] } }
+      const actualData = response.data.data || response.data
+
+      if (actualData.success) {
+        const { total_requests, successful, failed } = actualData
+        message.success(
+          `批量生成完成！共处理 ${total_requests} 个需求，成功 ${successful} 个，失败 ${failed} 个`
+        )
+
+        // TODO: 展示生成结果，可以跳转到结果页面或显示弹窗
+        // 这里可以添加逻辑来展示每个需求的生成结果
+      } else {
+        message.error('批量生成失败: ' + (actualData.error || '未知错误'))
+      }
+    } catch (error: any) {
+      console.error('批量生成失败:', error)
+      message.error('批量生成失败: ' + (error.response?.data?.message || error.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 表格列配置
+  const columns = [
     {
       title: '序号',
-      key: 'index',
-      width: 60,
+      dataIndex: 'key',
+      key: 'key',
+      width: 80,
       render: (_: any, __: any, index: number) => index + 1,
     },
     {
-      title: '模块',
-      dataIndex: 'module',
-      key: 'module',
+      title: '模块名称',
+      dataIndex: 'moduleName',
+      key: 'moduleName',
+      width: 200,
+    },
+    {
+      title: '所属系统',
+      dataIndex: 'system',
+      key: 'system',
       width: 150,
-      render: (text: string, record: Requirement) => (
-        <Input
-          value={text}
-          placeholder="输入模块名称"
-          onChange={(e) => handleUpdateRequirement(record.id, 'module', e.target.value)}
-        />
-      ),
-    },
-    {
-      title: '需求描述',
-      dataIndex: 'requirement',
-      key: 'requirement',
-      render: (text: string, record: Requirement) => (
-        <TextArea
-          value={text}
-          placeholder="输入需求描述..."
-          autoSize={{ minRows: 2, maxRows: 4 }}
-          onChange={(e) => handleUpdateRequirement(record.id, 'requirement', e.target.value)}
-        />
-      ),
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 100,
-      render: (_: any, record: Requirement) => (
-        <Button
-          type="link"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleRemoveRequirement(record.id)}
-        >
-          删除
-        </Button>
-      ),
-    },
-  ];
-
-  /**
-   * Result table columns
-   */
-  const resultColumns = [
-    {
-      title: '模块',
-      dataIndex: 'module',
-      key: 'module',
     },
     {
       title: '生成数量',
-      dataIndex: 'count',
-      key: 'count',
+      dataIndex: 'numCases',
+      key: 'numCases',
+      width: 120,
+      render: (num: number) => `${num}条`,
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <Tag color={status === 'success' ? 'green' : 'red'}>
-          {status === 'success' ? '成功' : '失败'}
-        </Tag>
+      title: '操作',
+      key: 'action',
+      width: 200,
+      render: (_: any, record: Requirement) => (
+        <Space size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleOpenEditModal(record)}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title="确定要删除这个需求吗？"
+            onConfirm={() => handleDeleteRequirement(record.key)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="link"
+              danger
+              size="small"
+              icon={<DeleteOutlined />}
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
-    {
-      title: '生成时间',
-      dataIndex: 'generation_time',
-      key: 'generation_time',
-      render: (time: number) => `${time?.toFixed(1)}s`,
-    },
-  ];
+  ]
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="batch-generate-container">
+      <h2 style={{ marginBottom: 24 }}>批量测试用例生成</h2>
+
+      {/* 上传需求区域 */}
       <Card
-        title={
+        title="批量上传需求"
+        extra={
           <Space>
-            <ThunderboltOutlined />
-            <span>批量生成测试用例</span>
+            <Button onClick={handleDownloadTemplate}>📥 下载模板</Button>
+            <Button onClick={handleUseExample}>📝 使用示例</Button>
           </Space>
         }
       >
-        <Form form={form} layout="vertical" onFinish={handleBatchGenerate}>
-          {/* File Upload Section */}
-          <Form.Item
-            label="导入需求文件"
-            help="支持Excel (.xlsx, .xls) 或 CSV文件"
+        <Dragger {...uploadProps}>
+          <p className="ant-upload-drag-icon">
+            <InboxOutlined />
+          </p>
+          <p className="ant-upload-text">点击选择文件或拖拽文件到此处</p>
+          <p className="ant-upload-hint">支持 .xlsx, .xls 格式</p>
+        </Dragger>
+
+        <div style={{ textAlign: 'center', margin: '24px 0', color: '#8c8c8c' }}>
+          或
+        </div>
+
+        <div style={{ textAlign: 'center' }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleOpenAddModal}
           >
-            <Upload
-              beforeUpload={handleUpload}
-              accept=".xlsx,.xls,.csv"
-              maxCount={1}
-              showUploadList={false}
+            手动添加需求
+          </Button>
+        </div>
+      </Card>
+
+      {/* 需求列表 */}
+      <Card
+        title={`需求列表 (已添加 ${requirements.length} 个需求)`}
+        extra={
+          requirements.length > 0 && (
+            <Popconfirm
+              title="确定要清空所有需求吗？"
+              onConfirm={handleDeleteAll}
+              okText="确定"
+              cancelText="取消"
             >
-              <Button icon={<UploadOutlined />}>上传Excel文件</Button>
-            </Upload>
-          </Form.Item>
+              <Button danger>全部删除</Button>
+            </Popconfirm>
+          )
+        }
+        style={{ marginTop: 24 }}
+      >
+        <Table
+          columns={columns}
+          dataSource={requirements}
+          pagination={false}
+          locale={{ emptyText: '暂无需求，请添加需求' }}
+        />
 
-          {/* Manual Add Section */}
-          <Form.Item label="需求列表">
-            <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              <Space>
-                <Button
-                  type="dashed"
-                  icon={<PlusOutlined />}
-                  onClick={handleAddRequirement}
-                >
-                  手动添加需求
-                </Button>
-                {requirements.length > 0 && (
-                  <Button danger onClick={handleClear}>
-                    清空列表
-                  </Button>
-                )}
-              </Space>
-
-              {requirements.length > 0 && (
-                <Table
-                  dataSource={requirements}
-                  columns={requirementColumns}
-                  rowKey="id"
-                  pagination={false}
-                  size="small"
-                />
-              )}
-            </Space>
-          </Form.Item>
-
-          {/* Generation Settings */}
-          {requirements.length > 0 && (
-            <Card type="inner" title="生成配置" style={{ marginBottom: 16 }}>
-              <Form.Item
-                label="每个需求生成用例数"
-                name="numCases"
-                initialValue={5}
+        {/* 配置参数 */}
+        {requirements.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <Space size="middle">
+              <Checkbox
+                checked={applyAdvanced}
+                onChange={(e) => setApplyAdvanced(e.target.checked)}
               >
-                <InputNumber min={1} max={20} />
-              </Form.Item>
-
-              <Form.Item name="includeEdgeCases" valuePropName="checked" initialValue={true}>
-                <Checkbox>包含边界场景</Checkbox>
-              </Form.Item>
-
-              <Form.Item name="enableDedup" valuePropName="checked" initialValue={true}>
-                <Checkbox>自动去重</Checkbox>
-              </Form.Item>
-
-              <Form.Item name="enablePrioritize" valuePropName="checked" initialValue={true}>
-                <Checkbox>自动优先级排序</Checkbox>
-              </Form.Item>
-            </Card>
-          )}
-
-          {/* Submit Button */}
-          {requirements.length > 0 && (
-            <Form.Item>
-              <Space>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={loading}
-                  icon={<ThunderboltOutlined />}
-                  size="large"
-                >
-                  批量生成 ({requirements.length} 个需求)
-                </Button>
-              </Space>
-            </Form.Item>
-          )}
-        </Form>
-
-        {/* Results Section */}
-        {loading && (
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <Spin size="large" />
-            <div style={{ marginTop: 16, color: '#888' }}>
-              AI正在批量生成测试用例，请稍候...
-            </div>
+                统一应用高级配置
+              </Checkbox>
+              <Checkbox
+                checked={autoDeduplicate}
+                onChange={(e) => setAutoDeduplicate(e.target.checked)}
+              >
+                自动去重
+              </Checkbox>
+              <Checkbox
+                checked={prioritySort}
+                onChange={(e) => setPrioritySort(e.target.checked)}
+              >
+                优先级排序
+              </Checkbox>
+              <span>最大用例数:</span>
+              <InputNumber
+                min={1}
+                max={1000}
+                value={maxCases}
+                onChange={(value) => setMaxCases(value || 100)}
+                style={{ width: 80 }}
+              />
+            </Space>
           </div>
         )}
 
-        {results && !loading && (
-          <div style={{ marginTop: 32 }}>
-            <Card title="生成结果" type="inner">
-              <div style={{ marginBottom: 16 }}>
-                <Space size="large">
-                  <Statistic title="总需求数" value={results.total_requests || 0} />
-                  <Statistic title="总用例数" value={results.total_cases || 0} />
-                  <Statistic
-                    title="成功率"
-                    value={
-                      results.results
-                        ? (results.results.filter((r: any) => r.success).length /
-                            results.results.length) *
-                          100
-                        : 0
-                    }
-                    precision={1}
-                    suffix="%"
-                  />
-                  <Statistic
-                    title="总耗时"
-                    value={results.total_time?.toFixed(1) || 0}
-                    suffix="s"
-                  />
-                </Space>
-              </div>
-
-              {results.results && (
-                <Table
-                  dataSource={results.results}
-                  columns={resultColumns}
-                  rowKey={(record, index) => index}
-                  pagination={false}
-                  size="small"
-                />
-              )}
-            </Card>
+        {/* 操作按钮 */}
+        {requirements.length > 0 && (
+          <div style={{ marginTop: 24, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => setRequirements([])}>取消</Button>
+              <Button
+                type="primary"
+                size="large"
+                loading={loading}
+                onClick={handleBatchGenerate}
+              >
+                开始批量生成 ({requirements.length}个任务)
+              </Button>
+            </Space>
           </div>
         )}
       </Card>
-    </div>
-  );
-};
 
-// Add Statistic component
-const Statistic = ({ title, value, suffix, precision }: any) => (
-  <div>
-    <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>{title}</div>
-    <div style={{ fontSize: 24, fontWeight: 'bold' }}>
-      {typeof value === 'number' && precision
-        ? value.toFixed(precision)
-        : value}
-      {suffix && <span style={{ fontSize: 14, marginLeft: 4 }}>{suffix}</span>}
-    </div>
-  </div>
-);
+      {/* 添加需求弹窗 */}
+      <Modal
+        title="添加需求"
+        open={addModalVisible}
+        onOk={handleAddRequirement}
+        onCancel={() => setAddModalVisible(false)}
+        okText="添加"
+        cancelText="取消"
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            label="模块名称"
+            name="moduleName"
+            rules={[{ required: true, message: '请输入模块名称' }]}
+          >
+            <Input placeholder="例如：用户登录模块" />
+          </Form.Item>
+          <Form.Item
+            label="所属系统"
+            name="system"
+            rules={[{ required: true, message: '请输入所属系统' }]}
+          >
+            <Input placeholder="例如：用户认证" />
+          </Form.Item>
+          <Form.Item
+            label="生成数量"
+            name="numCases"
+            initialValue={10}
+            rules={[{ required: true, message: '请输入生成数量' }]}
+          >
+            <InputNumber
+              min={1}
+              max={50}
+              style={{ width: '100%' }}
+              placeholder="1-50"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
-export default BatchGenerate;
+      {/* 编辑需求弹窗 */}
+      <Modal
+        title="编辑需求"
+        open={editModalVisible}
+        onOk={handleEditRequirement}
+        onCancel={() => setEditModalVisible(false)}
+        okText="保存"
+        cancelText="取消"
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            label="模块名称"
+            name="moduleName"
+            rules={[{ required: true, message: '请输入模块名称' }]}
+          >
+            <Input placeholder="例如：用户登录模块" />
+          </Form.Item>
+          <Form.Item
+            label="所属系统"
+            name="system"
+            rules={[{ required: true, message: '请输入所属系统' }]}
+          >
+            <Input placeholder="例如：用户认证" />
+          </Form.Item>
+          <Form.Item
+            label="生成数量"
+            name="numCases"
+            rules={[{ required: true, message: '请输入生成数量' }]}
+          >
+            <InputNumber
+              min={1}
+              max={50}
+              style={{ width: '100%' }}
+              placeholder="1-50"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  )
+}
+
+export default BatchGenerate

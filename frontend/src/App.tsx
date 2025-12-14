@@ -46,19 +46,15 @@ const App: React.FC = () => {
     {
       key: 'test-cases',
       icon: <FileTextOutlined />,
-      label: '测试用例 (Test Cases)',
+      label: '用例生成 (Case Generation)',
       children: [
         {
           key: '/test-cases/smart-generate',
           label: <Link to="/test-cases/smart-generate">智能生成 (Smart Generate)</Link>,
         },
         {
-          key: '/test-cases/generate',
-          label: <Link to="/test-cases/generate">AI生成 (AI Generate)</Link>,
-        },
-        {
           key: '/test-cases/batch-generate',
-          label: <Link to="/test-cases/batch-generate">批量生成 (Batch)</Link>,
+          label: <Link to="/test-cases/batch-generate">批量生成 (Batch Generate)</Link>,
         },
         {
           key: '/test-cases/list',

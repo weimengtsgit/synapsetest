@@ -1,5 +1,49 @@
 ## 项目更新记录
 
+### 2025-12-14 - 实现批量生成后端接口调用
+- 更新 BatchGenerate.tsx 实现批量生成接口调用:
+  - 添加 requirementText 字段到 Requirement 接口
+  - 实现 handleBatchGenerate 函数调用后端接口
+  - 请求接口: `POST /api/v1/ai/testcase/generate/batch`
+  - 请求参数格式: `{ requirements: [...] }`，每个需求包含:
+    - requirement_text: 需求文本
+    - module: 模块名称
+    - num_cases: 生成数量
+    - include_edge_cases: 是否包含边界用例
+    - optimization: 优化配置（去重、优先级排序等）
+  - 响应格式: `{ success: true, data: { success: true, total_requests, successful, failed, results: [...] } }`
+  - 添加成功/失败提示消息
+  - 导入 axios 用于HTTP请求
+
+### 2025-12-14 - 实现批量生成Excel模板下载和上传功能
+- 安装 xlsx 库用于Excel文件处理
+- 实现"下载模板"功能:
+  - 生成标准Excel模板文件（.xlsx格式）
+  - 包含两个Sheet：批量生成模板、使用说明
+  - 模板包含示例数据：模块名称、所属系统、生成数量
+  - 自动设置列宽，优化显示效果
+- 实现"上传解析"功能:
+  - 支持上传 .xlsx/.xls 格式的Excel文件
+  - 自动解析Excel内容并提取需求数据
+  - 兼容中英文字段名（模块名称/moduleName等）
+  - 数据验证和错误提示
+  - 成功后自动添加到需求列表
+
+### 2025-12-14 - 重构批量生成功能和菜单结构
+- 菜单结构调整:
+  - "测试用例" 更名为 "用例生成"
+  - 移除 "AI生成" 菜单项（功能已由"智能生成"替代）
+  - 保留 "智能生成"、"批量生成"、"用例列表" 三个子菜单
+- 重构批量生成页面 (BatchGenerate.tsx):
+  - 参考 UI原型演示.html 的设计
+  - 支持拖拽上传 .xlsx/.xls 文件
+  - 支持手动添加需求
+  - 需求列表展示（序号、模块名称、所属系统、生成数量）
+  - 支持编辑和删除需求
+  - 配置参数：统一应用高级配置、自动去重、优先级排序、最大用例数
+  - 开始批量生成按钮
+- 新增 BatchGenerate.css 样式文件
+
 ### 2025-12-14 - 统一后端API返回格式
 - 修复了"用例列表"页面显示 'Failed to load test cases' 的问题
 - 问题原因: 后端部分接口未使用统一的 ApiResponse 包装格式
