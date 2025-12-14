@@ -217,6 +217,41 @@ async def analyze_quality(testcases: List[Dict[str, Any]]):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/history")
+async def get_generation_history(
+    limit: int = 50,
+    offset: int = 0,
+    module: Optional[str] = None
+):
+    """
+    Get test case generation history from vector database
+
+    Args:
+        limit: Number of records to return (default: 50)
+        offset: Number of records to skip (default: 0)
+        module: Filter by module name (optional)
+    """
+    start_time = time.time()
+    try:
+        logger.info(f"[REQUEST] GET /testcase/history?limit={limit}&offset={offset}&module={module}")
+
+        result = generation_service.get_generation_history(
+            limit=limit,
+            offset=offset,
+            module=module
+        )
+
+        elapsed_time = time.time() - start_time
+        logger.info(f"[RESPONSE] GET /testcase/history - Status: SUCCESS, Time: {elapsed_time:.2f}s\n{json.dumps(result, ensure_ascii=False, indent=2, default=str)}")
+
+        return result
+
+    except Exception as e:
+        elapsed_time = time.time() - start_time
+        logger.error(f"[RESPONSE] GET /testcase/history - Status: FAILED, Time: {elapsed_time:.2f}s, Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/health")
 async def health_check():
     """Health check endpoint"""

@@ -5,10 +5,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -297,6 +294,48 @@ public class AIServiceClient {
     }
 
     /**
+     * Get test case generation history
+     *
+     * @param limit Number of records to return
+     * @param offset Number of records to skip
+     * @param module Filter by module name
+     * @return Generation history
+     */
+    @CircuitBreaker(name = "aiService", fallbackMethod = "getGenerationHistoryFallback")
+    @Retry(name = "aiService")
+    public Map<String, Object> getGenerationHistory(Integer limit, Integer offset, String module) {
+        StringBuilder urlBuilder = new StringBuilder(buildUrl("/testcase/history"));
+        urlBuilder.append("?limit=").append(limit != null ? limit : 50);
+        urlBuilder.append("&offset=").append(offset != null ? offset : 0);
+        if (module != null && !module.isEmpty()) {
+            urlBuilder.append("&module=").append(module);
+        }
+        String url = urlBuilder.toString();
+
+        log.info("Calling AI Service to get generation history");
+
+        try {
+            HttpEntity<?> httpEntity = new HttpEntity<>(createHeaders());
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                httpEntity,
+                Map.class
+            );
+
+            Map<String, Object> result = response.getBody();
+            log.info("Successfully retrieved generation history from AI Service");
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("Failed to get generation history from AI Service: {}", e.getMessage(), e);
+            throw new AIServiceException("Failed to get generation history", e);
+        }
+    }
+
+    /**
      * Check AI Service health
      *
      * @return Health status
@@ -465,6 +504,22 @@ public class AIServiceClient {
         fallbackExplanation.put("message", "AI服务暂时不可用");
 
         return fallbackExplanation;
+    }
+
+    /**
+     * Fallback method for get generation history
+     */
+    private Map<String, Object> getGenerationHistoryFallback(
+            Integer limit, Integer offset, String module, Exception e) {
+        log.warn("AI Service is unavailable, using fallback for generation history: {}", e.getMessage());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "AI服务暂时不可用，无法获取生成历史");
+        response.put("total", 0);
+        response.put("records", Collections.emptyList());
+
+        return response;
     }
 
     /**

@@ -6,6 +6,7 @@ import com.synapsetest.testmanagement.client.AIServiceClient;
 import com.synapsetest.testmanagement.constants.ApiVersion;
 import com.synapsetest.testmanagement.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -253,6 +254,35 @@ public class AIController {
 
         long elapsedTime = System.currentTimeMillis() - startTime;
         log.info("[RESPONSE] POST /api/v1/ai/recommendation/strategy/explain - Time: {}ms\n{}",
+                 elapsedTime, toJsonString(result));
+
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * Get test case generation history
+     *
+     * GET /api/v1/ai/testcase/history
+     */
+    @GetMapping("/testcase/history")
+    @Operation(summary = "Get test case generation history",
+               description = "Retrieves historical test case generation records from vector database")
+    public ApiResponse<Map<String, Object>> getGenerationHistory(
+            @Parameter(description = "Number of records to return", example = "50")
+            @RequestParam(required = false, defaultValue = "50") Integer limit,
+            @Parameter(description = "Number of records to skip", example = "0")
+            @RequestParam(required = false, defaultValue = "0") Integer offset,
+            @Parameter(description = "Filter by module name")
+            @RequestParam(required = false) String module) {
+
+        long startTime = System.currentTimeMillis();
+        log.info("[REQUEST] GET /api/v1/ai/testcase/history?limit={}&offset={}&module={}",
+                 limit, offset, module);
+
+        Map<String, Object> result = aiServiceClient.getGenerationHistory(limit, offset, module);
+
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        log.info("[RESPONSE] GET /api/v1/ai/testcase/history - Time: {}ms\n{}",
                  elapsedTime, toJsonString(result));
 
         return ApiResponse.success(result);
