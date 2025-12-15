@@ -89,10 +89,6 @@ const App: React.FC = () => {
           key: '/case-management/optimization',
           label: <Link to="/case-management/optimization">用例优化 (Optimization)</Link>,
         },
-        {
-          key: '/case-management/execution',
-          label: <Link to="/case-management/execution">执行跟踪 (Execution)</Link>,
-        },
       ],
     },
     {
@@ -107,6 +103,10 @@ const App: React.FC = () => {
         {
           key: '/test-tasks/list',
           label: <Link to="/test-tasks/list">任务列表 (List)</Link>,
+        },
+        {
+          key: '/test-tasks/execution',
+          label: <Link to="/test-tasks/execution">执行跟踪 (Execution)</Link>,
         },
       ],
     },
@@ -180,11 +180,11 @@ const App: React.FC = () => {
               {/* Case Management */}
               <Route path="/case-management/list" element={<TestCaseList />} />
               <Route path="/case-management/optimization" element={<TestCaseOptimization />} />
-              <Route path="/case-management/execution" element={<ExecutionTracking />} />
 
               {/* Test Tasks */}
               <Route path="/test-tasks/create" element={<CreateTestTask />} />
               <Route path="/test-tasks/list" element={<TestTaskList />} />
+              <Route path="/test-tasks/execution" element={<ExecutionTracking />} />
 
               {/* Monitoring & Reports */}
               <Route path="/monitoring/dashboard" element={<Dashboard />} />
