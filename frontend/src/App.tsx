@@ -30,6 +30,8 @@ import StrategyRecommendation from './components/recommendation/StrategyRecommen
 import AppHeader from './components/layout/AppHeader'
 import SmartGenerate from './components/test-case/SmartGenerate'
 import GenerationHistory from './components/test-case/GenerationHistory'
+import TestCaseOptimization from './components/test-case/TestCaseOptimization'
+import ExecutionTracking from './components/test-case/ExecutionTracking'
 
 const { Header, Content, Footer, Sider } = Layout
 
@@ -61,10 +63,6 @@ const App: React.FC = () => {
           key: '/test-cases/history',
           label: <Link to="/test-cases/history">生成历史 (History)</Link>,
         },
-        {
-          key: '/test-cases/list',
-          label: <Link to="/test-cases/list">用例列表 (List)</Link>,
-        },
       ],
     },
     {
@@ -75,6 +73,25 @@ const App: React.FC = () => {
         {
           key: '/recommendation/strategy',
           label: <Link to="/recommendation/strategy">策略推荐 (Strategy)</Link>,
+        },
+      ],
+    },
+    {
+      key: 'case-management',
+      icon: <BarChartOutlined />,
+      label: '用例管理 (Case Management)',
+      children: [
+        {
+          key: '/case-management/list',
+          label: <Link to="/case-management/list">用例列表 (List)</Link>,
+        },
+        {
+          key: '/case-management/optimization',
+          label: <Link to="/case-management/optimization">用例优化 (Optimization)</Link>,
+        },
+        {
+          key: '/case-management/execution',
+          label: <Link to="/case-management/execution">执行跟踪 (Execution)</Link>,
         },
       ],
     },
@@ -156,10 +173,14 @@ const App: React.FC = () => {
               <Route path="/test-cases/generate" element={<AITestCaseGeneration />} />
               <Route path="/test-cases/batch-generate" element={<BatchGenerate />} />
               <Route path="/test-cases/history" element={<GenerationHistory />} />
-              <Route path="/test-cases/list" element={<TestCaseList />} />
 
               {/* AI Recommendation */}
               <Route path="/recommendation/strategy" element={<StrategyRecommendation />} />
+
+              {/* Case Management */}
+              <Route path="/case-management/list" element={<TestCaseList />} />
+              <Route path="/case-management/optimization" element={<TestCaseOptimization />} />
+              <Route path="/case-management/execution" element={<ExecutionTracking />} />
 
               {/* Test Tasks */}
               <Route path="/test-tasks/create" element={<CreateTestTask />} />
