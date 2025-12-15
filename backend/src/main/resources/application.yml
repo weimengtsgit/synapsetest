@@ -135,3 +135,8 @@ resilience4j:
         retry-exceptions:
           - org.springframework.web.client.ResourceAccessException
           - java.net.SocketTimeoutException
+cors:
+  allowed-origins:
+    - http://localhost:3000
+    - http://10.56.62.204:3000
+    - http://127.0.0.1:3000

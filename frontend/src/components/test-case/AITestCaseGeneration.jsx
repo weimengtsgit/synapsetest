@@ -23,6 +23,7 @@ import {
   EditOutlined,
 } from '@ant-design/icons'
 import testCaseService from '../../services/testCaseService'
+import { convertPriorityToLabel, getPriorityColor } from '../../utils/priorityUtils'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -106,12 +107,6 @@ const AITestCaseGeneration = () => {
     } else {
       message.warning(`成功: ${successCount}, 失败: ${failCount}`)
     }
-  }
-
-  const getPriorityColor = (priority) => {
-    if (priority >= 8) return 'red'
-    if (priority >= 5) return 'orange'
-    return 'blue'
   }
 
   const getTypeColor = (type) => {
@@ -254,7 +249,7 @@ const AITestCaseGeneration = () => {
                         <Space>
                           <Tag color={getTypeColor(testCase.type)}>{testCase.type}</Tag>
                           <Tag color={getPriorityColor(testCase.priority)}>
-                            P{testCase.priority}
+                            {convertPriorityToLabel(testCase.priority)}
                           </Tag>
                           {testCase.tags &&
                             testCase.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}

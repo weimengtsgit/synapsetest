@@ -15,6 +15,10 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 public class TestCase extends BaseEntity {
 
+    @NotBlank(message = "Case number is required")
+    @Size(max = 20, message = "Case number must not exceed 20 characters")
+    private String caseNumber;
+
     @NotBlank(message = "Title is required")
     @Size(min = 5, max = 100, message = "Title must be between 5 and 100 characters")
     private String title;

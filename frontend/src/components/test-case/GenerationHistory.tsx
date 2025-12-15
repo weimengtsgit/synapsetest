@@ -19,6 +19,7 @@ import {
 } from '@ant-design/icons'
 import axios from 'axios'
 import type { ColumnsType } from 'antd/es/table'
+import { getPriorityColor } from '../../utils/priorityUtils'
 import './GenerationHistory.css'
 
 const { Search } = Input
@@ -114,17 +115,6 @@ const GenerationHistory: React.FC = () => {
   const handleViewDetail = (record: HistoryRecord) => {
     setSelectedRecord(record)
     setDetailModalVisible(true)
-  }
-
-  // 优先级颜色
-  const getPriorityColor = (priority: string) => {
-    const colorMap: Record<string, string> = {
-      P0: 'red',
-      P1: 'orange',
-      P2: 'blue',
-      P3: 'default',
-    }
-    return colorMap[priority] || 'default'
   }
 
   // 类型颜色

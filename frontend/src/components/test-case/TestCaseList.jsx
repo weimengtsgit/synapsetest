@@ -24,6 +24,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import testCaseService from '../../services/testCaseService'
+import { convertPriorityToLabel, getPriorityColor } from '../../utils/priorityUtils'
 
 const { Option } = Select
 const { Panel } = Collapse
@@ -197,12 +198,6 @@ const TestCaseList = () => {
     return colors[type] || 'default'
   }
 
-  const getPriorityColor = (priority) => {
-    if (priority >= 8) return 'red'
-    if (priority >= 5) return 'orange'
-    return 'blue'
-  }
-
   const columns = [
     {
       title: '用例标题 (Title)',
@@ -224,9 +219,10 @@ const TestCaseList = () => {
       key: 'priority',
       width: 100,
       sorter: (a, b) => a.priority - b.priority,
-      render: (priority) => (
-        <Tag color={getPriorityColor(priority)}>P{priority}</Tag>
-      ),
+      render: (priority) => {
+        const label = convertPriorityToLabel(priority)
+        return <Tag color={getPriorityColor(priority)}>{label}</Tag>
+      },
     },
     {
       title: '状态 (Status)',
@@ -389,7 +385,7 @@ const TestCaseList = () => {
               </Descriptions.Item>
               <Descriptions.Item label="优先级">
                 <Tag color={getPriorityColor(selectedTestCase.priority)}>
-                  P{selectedTestCase.priority}
+                  {convertPriorityToLabel(selectedTestCase.priority)}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="状态">

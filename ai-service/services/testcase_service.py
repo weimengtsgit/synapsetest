@@ -580,6 +580,7 @@ class TestCaseOptimizationService:
         return {
             'id': testcase.get('id', case_name),
             'testcase_id': testcase.get('id', case_name),
+            'case_number': testcase.get('case_number', testcase.get('caseNumber', '')),
             'title': case_title or case_name,
             'name': case_name or case_title,
             'module': testcase.get('module', ''),

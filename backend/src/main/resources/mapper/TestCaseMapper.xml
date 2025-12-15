@@ -6,15 +6,21 @@
     <!-- Result Map for TestCase -->
     <resultMap id="TestCaseResultMap" type="com.synapsetest.testmanagement.model.TestCase">
         <id property="id" column="id"/>
+        <result property="caseNumber" column="case_number"/>
         <result property="title" column="title"/>
         <result property="description" column="description"/>
-        <result property="steps" column="steps" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+        <result property="steps" column="steps" typeHandler="com.synapsetest.testmanagement.config.StepsTypeHandler"/>
         <result property="expectedResult" column="expected_result"/>
         <result property="priority" column="priority"/>
         <result property="type" column="type"/>
         <result property="status" column="status"/>
         <result property="tags" column="tags" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
         <result property="relatedRequirement" column="related_requirement"/>
+        <result property="module" column="module"/>
+        <result property="preconditions" column="preconditions" typeHandler="com.synapsetest.testmanagement.config.JsonTypeHandler"/>
+        <result property="qualityScore" column="quality_score"/>
+        <result property="aiGenerated" column="ai_generated"/>
+        <result property="aiConfidence" column="ai_confidence"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="createdBy" column="created_by"/>
@@ -27,27 +33,27 @@
 
     <!-- Select All -->
     <select id="selectAll" resultMap="TestCaseResultMap">
-        SELECT * FROM test_cases
+        SELECT * FROM test_cases ORDER BY created_at DESC
     </select>
 
     <!-- Select by Type -->
     <select id="selectByType" resultMap="TestCaseResultMap">
-        SELECT * FROM test_cases WHERE type = #{type}
+        SELECT * FROM test_cases WHERE type = #{type} ORDER BY created_at DESC
     </select>
 
     <!-- Select by Status -->
     <select id="selectByStatus" resultMap="TestCaseResultMap">
-        SELECT * FROM test_cases WHERE status = #{status}
+        SELECT * FROM test_cases WHERE status = #{status} ORDER BY created_at DESC
     </select>
 
     <!-- Select by Related Requirement -->
     <select id="selectByRelatedRequirement" resultMap="TestCaseResultMap">
-        SELECT * FROM test_cases WHERE related_requirement = #{relatedRequirement}
+        SELECT * FROM test_cases WHERE related_requirement = #{relatedRequirement} ORDER BY created_at DESC
     </select>
 
     <!-- Select by Created By -->
     <select id="selectByCreatedBy" resultMap="TestCaseResultMap">
-        SELECT * FROM test_cases WHERE created_by = #{createdBy}
+        SELECT * FROM test_cases WHERE created_by = #{createdBy} ORDER BY created_at DESC
     </select>
 
     <!-- Select by Status Order by Priority Desc -->
@@ -58,10 +64,13 @@
     <!-- Insert -->
     <insert id="insert" parameterType="com.synapsetest.testmanagement.model.TestCase">
         INSERT INTO test_cases(
-            id, title, description, type, status, priority, expected_result,
-            related_requirement, steps, tags, created_at, updated_at, created_by
+            id, case_number, title, description, type, status, priority, expected_result,
+            related_requirement, module, steps, tags, preconditions,
+            quality_score, ai_generated, ai_confidence,
+            created_at, updated_at, created_by
         ) VALUES (
             #{id},
+            #{caseNumber},
             #{title},
             #{description},
             #{type},
@@ -69,8 +78,13 @@
             #{priority},
             #{expectedResult},
             #{relatedRequirement},
-            #{steps, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            #{module},
+            #{steps, typeHandler=com.synapsetest.testmanagement.config.StepsTypeHandler},
             #{tags, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            #{preconditions, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            #{qualityScore},
+            #{aiGenerated},
+            #{aiConfidence},
             #{createdAt},
             #{updatedAt},
             #{createdBy}
@@ -80,6 +94,7 @@
     <!-- Update -->
     <update id="update" parameterType="com.synapsetest.testmanagement.model.TestCase">
         UPDATE test_cases SET
+            case_number = #{caseNumber},
             title = #{title},
             description = #{description},
             type = #{type},
@@ -87,8 +102,13 @@
             priority = #{priority},
             expected_result = #{expectedResult},
             related_requirement = #{relatedRequirement},
+            module = #{module},
             steps = #{steps, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
             tags = #{tags, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            preconditions = #{preconditions, typeHandler=com.synapsetest.testmanagement.config.JsonTypeHandler},
+            quality_score = #{qualityScore},
+            ai_generated = #{aiGenerated},
+            ai_confidence = #{aiConfidence},
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
@@ -101,6 +121,15 @@
     <!-- Count -->
     <select id="count" resultType="int">
         SELECT COUNT(*) FROM test_cases
+    </select>
+
+    <!-- Find Max Case Number by Prefix -->
+    <select id="findMaxCaseNumberByPrefix" resultType="string">
+        SELECT case_number 
+        FROM test_cases 
+        WHERE case_number LIKE CONCAT(#{prefix}, '%')
+        ORDER BY case_number DESC 
+        LIMIT 1
     </select>
 
 </mapper>

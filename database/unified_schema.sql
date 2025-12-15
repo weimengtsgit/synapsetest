@@ -41,7 +41,8 @@ CREATE TABLE test_tasks (
 DROP TABLE IF EXISTS test_cases;
 CREATE TABLE test_cases (
     -- 基础字段 (Backend)
-    id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '用例ID',
+    id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '用例ID(技术主键)',
+    case_number VARCHAR(20) UNIQUE NOT NULL COMMENT '业务编号(如TC20231215001)',
     title VARCHAR(200) NOT NULL COMMENT '用例标题',
     description TEXT COMMENT '用例描述',
     steps JSON NOT NULL COMMENT '测试步骤',
@@ -67,6 +68,7 @@ CREATE TABLE test_cases (
     created_by VARCHAR(100) NOT NULL COMMENT '创建人',
 
     -- 索引
+    INDEX idx_case_number (case_number),
     INDEX idx_module (module),
     INDEX idx_type (type),
     INDEX idx_priority (priority),
@@ -355,8 +357,9 @@ VALUES
 -- ============================================
 
 -- 插入测试用例数据 (已转换为新表结构)
-INSERT INTO test_cases (id, title, description, steps, expected_result, priority, type, status, tags, module, preconditions, quality_score, ai_generated, ai_confidence, created_at, created_by) VALUES
-('TC001',
+INSERT INTO test_cases (id, case_number, title, description, steps, expected_result, priority, type, status, tags, module, preconditions, quality_score, ai_generated, ai_confidence, created_at, created_by) VALUES
+('550e8400-e29b-41d4-a716-446655440001',
+ 'TC20231215001',
  '手机号+验证码正常登录',
  '测试用户通过手机号和验证码进行正常登录流程',
  '[
@@ -378,7 +381,8 @@ INSERT INTO test_cases (id, title, description, steps, expected_result, priority
  NOW(),
  'admin'),
 
-('TC002',
+('550e8400-e29b-41d4-a716-446655440002',
+ 'TC20231215002',
  '微信第三方登录成功',
  '测试用户通过微信进行第三方登录',
  '[
@@ -398,7 +402,8 @@ INSERT INTO test_cases (id, title, description, steps, expected_result, priority
  NOW(),
  'admin'),
 
-('TC003',
+('550e8400-e29b-41d4-a716-446655440003',
+ 'TC20231215003',
  '支付宝支付成功',
  '测试用户使用支付宝完成支付流程',
  '[
@@ -419,7 +424,8 @@ INSERT INTO test_cases (id, title, description, steps, expected_result, priority
  NOW(),
  'admin'),
 
-('TC004',
+('550e8400-e29b-41d4-a716-446655440004',
+ 'TC20231215004',
  '订单创建成功',
  '测试用户从购物车创建订单的完整流程',
  '[
@@ -441,7 +447,8 @@ INSERT INTO test_cases (id, title, description, steps, expected_result, priority
  NOW(),
  'admin'),
 
-('TC005',
+('550e8400-e29b-41d4-a716-446655440005',
+ 'TC20231215005',
  '商品搜索精确匹配',
  '测试商品搜索功能的精确匹配能力',
  '[
@@ -450,7 +457,7 @@ INSERT INTO test_cases (id, title, description, steps, expected_result, priority
    {"step":3,"action":"查看搜索结果","expected":"结果精确匹配关键词"}
  ]',
  '搜索结果准确匹配用户输入的关键词',
- 7,   -- P1 -> 7
+ 8,   -- P1 -> 8
  'FUNCTIONAL',
  'APPROVED',
  '["搜索", "商品"]',
@@ -462,7 +469,8 @@ INSERT INTO test_cases (id, title, description, steps, expected_result, priority
  NOW(),
  'admin'),
 
-('TC006',
+('550e8400-e29b-41d4-a716-446655440006',
+ 'TC20231215006',
  '修改个人资料成功',
  '测试用户修改个人资料的功能',
  '[
