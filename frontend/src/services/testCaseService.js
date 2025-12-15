@@ -103,10 +103,64 @@ const testCaseService = {
   },
 
   /**
-   * Deduplicate test cases
+   * Get all distinct modules
+   */
+  getAllModules: async () => {
+    return apiClient.get('/test-cases/modules')
+  },
+
+  /**
+   * Deduplicate test cases using AI (old method, kept for compatibility)
    */
   deduplicateTestCases: async (testCases) => {
     return apiClient.post('/test-cases/deduplicate', testCases)
+  },
+
+  /**
+   * Analyze test cases for duplicates using AI
+   * Returns detailed duplicate groups for user review
+   */
+  analyzeDeduplication: async (params) => {
+    const { testcases, threshold, scope, modules } = params
+
+    // Build request body based on scope
+    let requestBody = { testcases, threshold }
+
+    if (scope === 'module' && modules && modules.length > 0) {
+      // Filter testcases by selected modules
+      requestBody.testcases = testcases.filter(tc =>
+        modules.includes(tc.module)
+      )
+    } else if (scope === 'selected') {
+      // testcases array should already contain only selected cases
+    }
+
+    return apiClient.post('/ai/testcase/optimize/deduplicate', requestBody)
+  },
+
+  /**
+   * Confirm deduplication optimization
+   * Applies user's selection to remove duplicate test cases
+   */
+  confirmOptimization: async (selectedCaseIds) => {
+    return apiClient.post('/ai/testcase/optimize/confirm', {
+      selected_case_ids: selectedCaseIds
+    })
+  },
+
+  /**
+   * Prioritize test cases using AI
+   * Returns test cases sorted by priority score with ranking
+   */
+  prioritizeTestCases: async (params) => {
+    const { testcases, customWeights } = params
+
+    const requestBody = {
+      testcases,
+      custom_weights: customWeights || null
+    }
+
+    return apiClient.post('/ai/testcase/optimize/prioritize', requestBody)
   },
 
   /**
@@ -114,6 +168,16 @@ const testCaseService = {
    */
   analyzeTestCoverage: async (testCases) => {
     return apiClient.post('/test-cases/analyze-coverage', testCases)
+  },
+
+  /**
+   * Analyze test case quality using AI
+   * Returns quality metrics and improvement suggestions
+   */
+  analyzeQuality: async (testcases) => {
+    return apiClient.post('/ai/testcase/analyze/quality', {
+      testcases
+    })
   },
 }
 

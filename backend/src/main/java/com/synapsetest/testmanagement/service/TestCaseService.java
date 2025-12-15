@@ -313,6 +313,26 @@ public class TestCaseService {
     }
 
     /**
+     * Get all distinct modules from test cases
+     */
+    public List<String> getAllModules() {
+        log.info("Getting all distinct modules");
+
+        List<TestCase> testCases = testCaseMapper.selectAll();
+
+        // Extract distinct non-null, non-empty modules
+        List<String> modules = testCases.stream()
+                .map(TestCase::getModule)
+                .filter(module -> module != null && !module.trim().isEmpty())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+
+        log.info("Found {} distinct modules", modules.size());
+        return modules;
+    }
+
+    /**
      * Convert entity to response DTO
      */
     private TestCaseResponse convertToResponse(TestCase testCase) {

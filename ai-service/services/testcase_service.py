@@ -476,30 +476,269 @@ class TestCaseOptimizationService:
         threshold: float = 0.85
     ) -> Dict[str, Any]:
         """
-        Deduplicate test cases
+        Deduplicate test cases and return detailed duplicate groups for user review
 
         Args:
             testcases: Test cases to deduplicate
             threshold: Similarity threshold
 
         Returns:
-            Deduplication result
+            Deduplication result with detailed duplicate groups
         """
-        logger.info(f"Deduplicating {len(testcases)} test cases")
+        logger.info(f"Deduplicating {len(testcases)} test cases with threshold {threshold}")
 
         from models.optimization.deduplicator import SemanticDeduplicator
 
         deduplicator = SemanticDeduplicator(similarity_threshold=threshold)
-        unique_cases, duplicate_groups = deduplicator.deduplicate(testcases)
+        unique_cases, duplicate_groups_raw = deduplicator.deduplicate(testcases)
+
+        # Enhance duplicate groups with detailed case information
+        enhanced_groups = []
+        group_id = 1
+
+        for group in duplicate_groups_raw:
+            # Find all cases in this group
+            group_cases = []
+            representative_name = group.get('representative', '')
+            duplicates = group.get('duplicates', [])
+            similarity_scores = group.get('similarity_scores', [])
+
+            # Add representative case
+            # Support both 'name' and 'caseName' fields
+            for tc in testcases:
+                tc_name = tc.get('name') or tc.get('caseName', '')
+                tc_title = tc.get('title', '')
+                if tc_name == representative_name or tc_title == representative_name:
+                    case_info = self._enrich_case_metadata(tc, selected=True)
+                    group_cases.append(case_info)
+                    break
+
+            # Add duplicate cases
+            for i, dup_name in enumerate(duplicates):
+                for tc in testcases:
+                    tc_name = tc.get('name') or tc.get('caseName', '')
+                    tc_title = tc.get('title', '')
+                    if tc_name == dup_name or tc_title == dup_name:
+                        case_info = self._enrich_case_metadata(tc, selected=False)
+                        case_info['similarity'] = round(similarity_scores[i] * 100) if i < len(similarity_scores) else 85
+                        group_cases.append(case_info)
+                        break
+
+            if group_cases:
+                # Calculate average similarity for this group
+                avg_similarity = sum(c.get('similarity', 100.0) for c in group_cases) / len(group_cases)
+
+                enhanced_groups.append({
+                    'id': group_id,
+                    'similarity': round(avg_similarity),  # Already in percentage
+                    'cases': group_cases,
+                    'reason': self._generate_similarity_reason(group_cases)
+                })
+                group_id += 1
+
+        # Calculate statistics
+        total_duplicates = sum(len(g['cases']) - 1 for g in enhanced_groups)
+        time_saved = round(total_duplicates * 0.5, 1)  # Assume 30 minutes per case
 
         return {
             'success': True,
-            'original_count': len(testcases),
-            'unique_count': len(unique_cases),
-            'duplicates_removed': len(testcases) - len(unique_cases),
-            'unique_testcases': unique_cases,
-            'duplicate_groups': duplicate_groups
+            'statistics': {
+                'original_count': len(testcases),
+                'unique_count': len(testcases) - total_duplicates,
+                'duplicate_count': total_duplicates,
+                'duplicate_groups': len(enhanced_groups),
+                'time_saved_hours': time_saved
+            },
+            'duplicate_groups': enhanced_groups,
+            'unique_testcases': unique_cases
         }
+
+    def _enrich_case_metadata(self, testcase: Dict[str, Any], selected: bool = False) -> Dict[str, Any]:
+        """
+        Enrich test case with metadata for duplicate analysis
+
+        Args:
+            testcase: Original test case
+            selected: Whether this case is selected as representative
+
+        Returns:
+            Enriched case information
+        """
+        import json
+
+        # Parse steps if they are JSON strings
+        steps = testcase.get('steps', [])
+        parsed_steps = self._parse_steps(steps)
+
+        # Calculate quality score based on completeness
+        quality_score = self._calculate_quality_score(testcase)
+
+        # Support both 'name' and 'caseName' fields
+        case_name = testcase.get('name') or testcase.get('caseName', '')
+        case_title = testcase.get('title', '')
+
+        return {
+            'id': testcase.get('id', case_name),
+            'testcase_id': testcase.get('id', case_name),
+            'title': case_title or case_name,
+            'name': case_name or case_title,
+            'module': testcase.get('module', ''),
+            'type': testcase.get('type', ''),
+            'priority': testcase.get('priority', 'P2'),
+            'description': testcase.get('description', ''),
+            'steps': parsed_steps,
+            'preconditions': testcase.get('preconditions', []),
+            'expected_result': testcase.get('expected_result', testcase.get('expectedResult', '')),
+            'quality_score': quality_score,
+            'last_executed': testcase.get('last_executed', '未执行'),
+            'defects_found': testcase.get('defects_found', 0),
+            'selected': selected,
+            'similarity': 100 if selected else 85
+        }
+
+    def _parse_steps(self, steps: Any) -> List[Dict[str, Any]]:
+        """
+        Parse steps field which may be in different formats
+
+        Args:
+            steps: Steps data (may be list of dicts, list of JSON strings, or JSON string)
+
+        Returns:
+            List of step dictionaries
+        """
+        import json
+
+        if not steps:
+            return []
+
+        parsed_steps = []
+
+        if isinstance(steps, str):
+            # Single JSON string
+            try:
+                parsed = json.loads(steps)
+                if isinstance(parsed, list):
+                    return self._parse_steps(parsed)
+                elif isinstance(parsed, dict):
+                    return [parsed]
+            except (json.JSONDecodeError, TypeError):
+                return [{'action': steps}]
+
+        if isinstance(steps, list):
+            for step in steps:
+                if isinstance(step, str):
+                    try:
+                        # Try to parse JSON string
+                        parsed = json.loads(step)
+                        if isinstance(parsed, list):
+                            parsed_steps.extend(parsed)
+                        elif isinstance(parsed, dict):
+                            parsed_steps.append(parsed)
+                        else:
+                            parsed_steps.append({'action': str(parsed)})
+                    except (json.JSONDecodeError, TypeError):
+                        # If not JSON, treat as plain text
+                        parsed_steps.append({'action': step})
+                elif isinstance(step, dict):
+                    parsed_steps.append(step)
+                else:
+                    parsed_steps.append({'action': str(step)})
+
+        return parsed_steps
+
+    def _calculate_quality_score(self, testcase: Dict[str, Any]) -> int:
+        """
+        Calculate quality score for a test case based on completeness
+
+        Args:
+            testcase: Test case dictionary
+
+        Returns:
+            Quality score (0-100)
+        """
+        score = 0
+
+        # Title (10 points)
+        if testcase.get('title') or testcase.get('name'):
+            score += 10
+
+        # Description (15 points)
+        description = testcase.get('description', '')
+        if description and len(description) > 20:
+            score += 15
+        elif description:
+            score += 8
+
+        # Steps (30 points)
+        steps = testcase.get('steps', [])
+        parsed_steps = self._parse_steps(steps)
+        if parsed_steps and len(parsed_steps) > 0:
+            score += min(30, len(parsed_steps) * 6)
+
+        # Expected result (15 points)
+        expected = testcase.get('expected_result', testcase.get('expectedResult', ''))
+        if expected and len(expected) > 10:
+            score += 15
+        elif expected:
+            score += 8
+
+        # Preconditions (10 points)
+        preconditions = testcase.get('preconditions', [])
+        if preconditions and len(preconditions) > 0:
+            score += 10
+
+        # Priority (10 points)
+        priority = testcase.get('priority', '')
+        if priority:
+            score += 10
+
+        # Module/Type (10 points)
+        if testcase.get('module') or testcase.get('type'):
+            score += 10
+
+        return min(100, score)
+
+    def _generate_similarity_reason(self, cases: List[Dict[str, Any]]) -> str:
+        """
+        Generate human-readable explanation for why cases are similar
+
+        Args:
+            cases: List of similar test cases
+
+        Returns:
+            Explanation string
+        """
+        if len(cases) < 2:
+            return "单个用例"
+
+        # Analyze similarity factors
+        factors = []
+
+        # Check title similarity
+        titles = [c.get('title', '') for c in cases]
+        if len(set(titles)) == 1:
+            factors.append("标题完全相同")
+        else:
+            factors.append("标题高度相似")
+
+        # Check steps similarity (use parsed steps)
+        steps_counts = []
+        for c in cases:
+            steps = c.get('steps', [])
+            parsed_steps = self._parse_steps(steps)
+            steps_counts.append(len(parsed_steps))
+
+        if len(set(steps_counts)) == 1 and steps_counts[0] > 0:
+            factors.append(f"测试步骤数量相同({steps_counts[0]}个)")
+        elif any(c > 0 for c in steps_counts):
+            factors.append("测试步骤部分重叠")
+
+        # Check module
+        modules = [c.get('module', '') for c in cases if c.get('module')]
+        if len(set(modules)) == 1 and modules:
+            factors.append(f"同属于'{modules[0]}'模块")
+
+        return "，".join(factors) if factors else "语义相似度较高"
 
     def prioritize(
         self,
@@ -573,7 +812,23 @@ class TestCaseOptimizationService:
         """Calculate priority distribution"""
         dist = {'P0': 0, 'P1': 0, 'P2': 0, 'P3': 0}
         for tc in testcases:
-            priority = tc.get('priority', 'P3')
+            priority = tc.get('priority', 5)
+            
+            # Convert integer priority (0-10) to P0-P3 format
+            if isinstance(priority, int):
+                if priority >= 9:
+                    priority = 'P0'
+                elif priority >= 7:
+                    priority = 'P1'
+                elif priority >= 4:
+                    priority = 'P2'
+                else:
+                    priority = 'P3'
+            elif isinstance(priority, str):
+                priority = priority.upper()
+            else:
+                priority = 'P3'
+            
             if priority in dist:
                 dist[priority] += 1
         return dist
@@ -585,7 +840,10 @@ class TestCaseOptimizationService:
         """Calculate test type distribution"""
         dist = {}
         for tc in testcases:
-            test_type = tc.get('type', '功能测试')
+            test_type = tc.get('type') or '功能测试'
+            # Ensure type is a string
+            if not isinstance(test_type, str):
+                test_type = str(test_type) if test_type else '功能测试'
             dist[test_type] = dist.get(test_type, 0) + 1
         return dist
 
@@ -597,14 +855,23 @@ class TestCaseOptimizationService:
         scores = []
         for tc in testcases:
             score = 0.0
-            # Has name
-            if tc.get('name'):
+            # Has name or title
+            if tc.get('name') or tc.get('title'):
                 score += 0.2
             # Has steps
             if tc.get('steps'):
                 score += 0.3
-            # Has expected results in steps
-            if any(s.get('expected') for s in tc.get('steps', [])):
+            # Has expected results (check both expectedResult field and steps structure)
+            has_expected = False
+            steps = tc.get('steps', [])
+            if steps:
+                # Check if steps are dictionaries with 'expected' field
+                if isinstance(steps[0], dict):
+                    has_expected = any(s.get('expected') for s in steps)
+                # If steps are strings, check for expectedResult at test case level
+                elif tc.get('expectedResult') or tc.get('expected_result'):
+                    has_expected = True
+            if has_expected:
                 score += 0.2
             # Has preconditions
             if tc.get('preconditions'):
