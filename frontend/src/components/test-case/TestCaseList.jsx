@@ -11,6 +11,9 @@ import {
   Descriptions,
   Collapse,
   Popconfirm,
+  Form,
+  Input,
+  InputNumber,
 } from 'antd'
 import {
   EyeOutlined,
@@ -18,6 +21,7 @@ import {
   DeleteOutlined,
   CheckCircleOutlined,
   SyncOutlined,
+  PlusOutlined,
 } from '@ant-design/icons'
 import testCaseService from '../../services/testCaseService'
 
@@ -37,6 +41,9 @@ const TestCaseList = () => {
   const [selectedStatus, setSelectedStatus] = useState('ALL')
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [selectedTestCase, setSelectedTestCase] = useState(null)
+  const [createModalVisible, setCreateModalVisible] = useState(false)
+  const [createForm] = Form.useForm()
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     loadTestCases()
@@ -116,6 +123,59 @@ const TestCaseList = () => {
       message.error('优化失败: ' + error.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateTestCase = () => {
+    setCreateModalVisible(true)
+    createForm.resetFields()
+  }
+
+  const handleCreateSubmit = async () => {
+    try {
+      const values = await createForm.validateFields()
+      setSubmitting(true)
+
+      // Process steps from textarea to array
+      const steps = values.steps
+        ? values.steps.split('\n').filter((s) => s.trim())
+        : []
+
+      // Process tags from comma-separated string to array
+      const tags = values.tags
+        ? values.tags.split(',').map((t) => t.trim()).filter((t) => t)
+        : []
+
+      const testCaseData = {
+        title: values.title,
+        type: values.type,
+        priority: values.priority,
+        status: 'DRAFT', // New cases start as DRAFT
+        description: values.description || '',
+        steps: steps,
+        expectedResult: values.expectedResult || '',
+        tags: tags,
+        relatedRequirement: values.relatedRequirement || '',
+      }
+
+      const response = await testCaseService.createTestCase(testCaseData)
+
+      if (response.success) {
+        message.success('测试用例创建成功')
+        setCreateModalVisible(false)
+        createForm.resetFields()
+        loadTestCases()
+      } else {
+        message.error('创建失败: ' + (response.message || '未知错误'))
+      }
+    } catch (error) {
+      if (error.errorFields) {
+        message.error('请填写所有必填字段')
+      } else {
+        message.error('创建失败: ' + error.message)
+      }
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -275,10 +335,13 @@ const TestCaseList = () => {
               <Option value="APPROVED">已批准 (Approved)</Option>
               <Option value="DEPRECATED">已废弃 (Deprecated)</Option>
             </Select>
+            <Button icon={<PlusOutlined />} type="primary" onClick={handleCreateTestCase}>
+              新建用例
+            </Button>
             <Button icon={<SyncOutlined />} onClick={loadTestCases}>
               刷新
             </Button>
-            <Button type="primary" onClick={handleOptimize}>
+            <Button type="dashed" onClick={handleOptimize}>
               智能优化
             </Button>
           </Space>
@@ -373,6 +436,92 @@ const TestCaseList = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Create Test Case Modal */}
+      <Modal
+        title="新建测试用例 (Create Test Case)"
+        visible={createModalVisible}
+        onCancel={() => {
+          setCreateModalVisible(false)
+          createForm.resetFields()
+        }}
+        onOk={handleCreateSubmit}
+        confirmLoading={submitting}
+        width={800}
+        okText="创建"
+        cancelText="取消"
+      >
+        <Form
+          form={createForm}
+          layout="vertical"
+          initialValues={{
+            type: 'FUNCTIONAL',
+            priority: 5,
+          }}
+        >
+          <Form.Item
+            label="用例标题 (Title)"
+            name="title"
+            rules={[{ required: true, message: '请输入用例标题' }]}
+          >
+            <Input placeholder="请输入测试用例标题" />
+          </Form.Item>
+
+          <Form.Item
+            label="测试类型 (Type)"
+            name="type"
+            rules={[{ required: true, message: '请选择测试类型' }]}
+          >
+            <Select>
+              <Option value="FUNCTIONAL">功能测试 (Functional)</Option>
+              <Option value="PERFORMANCE">性能测试 (Performance)</Option>
+              <Option value="SECURITY">安全测试 (Security)</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="优先级 (Priority)"
+            name="priority"
+            rules={[{ required: true, message: '请选择优先级' }]}
+          >
+            <InputNumber
+              min={0}
+              max={10}
+              style={{ width: '100%' }}
+              placeholder="0-10, 数值越大优先级越高"
+            />
+          </Form.Item>
+
+          <Form.Item label="用例描述 (Description)" name="description">
+            <Input.TextArea
+              rows={3}
+              placeholder="请输入测试用例的详细描述"
+            />
+          </Form.Item>
+
+          <Form.Item label="测试步骤 (Steps)" name="steps">
+            <Input.TextArea
+              rows={5}
+              placeholder="请输入测试步骤，每行一个步骤&#10;例如:&#10;1. 打开登录页面&#10;2. 输入用户名和密码&#10;3. 点击登录按钮"
+            />
+          </Form.Item>
+
+          <Form.Item label="预期结果 (Expected Result)" name="expectedResult">
+            <Input.TextArea
+              rows={3}
+              placeholder="请输入预期的测试结果"
+            />
+          </Form.Item>
+
+          <Form.Item label="关联需求 (Related Requirement)" name="relatedRequirement">
+            <Input placeholder="请输入关联的需求ID或描述" />
+          </Form.Item>
+
+          <Form.Item label="标签 (Tags)" name="tags">
+            <Input placeholder="请输入标签，多个标签用逗号分隔，例如: 登录,安全,核心功能" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   )
