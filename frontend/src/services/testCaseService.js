@@ -179,6 +179,14 @@ const testCaseService = {
       testcases
     })
   },
+
+  /**
+   * Submit user feedback for AI-generated test cases
+   * Helps improve model through reinforcement learning
+   */
+  submitFeedback: async (feedbackData) => {
+    return apiClient.post('/ai/testcase/feedback', feedbackData)
+  },
 }
 
 export default testCaseService

@@ -97,11 +97,11 @@ public class TestCaseController {
                     .body(Map.of("error", "test_cases cannot be empty"));
         }
 
-        List<String> savedIds = testCaseService.batchSaveTestCases(testCases, userId);
+        List<Map<String, String>> savedCases = testCaseService.batchSaveTestCases(testCases, userId);
 
         Map<String, Object> response = Map.of(
-                "saved_count", savedIds.size(),
-                "saved_ids", savedIds
+                "saved_count", savedCases.size(),
+                "saved_cases", savedCases
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

@@ -12,6 +12,7 @@ import java.util.List;
 public class TestCaseResponse {
 
     private String id;
+    private String caseNumber;  // 业务编号(如TC20231215001)
     private String title;
     private String caseName;  // Alias for title, used in some API responses
     private String description;

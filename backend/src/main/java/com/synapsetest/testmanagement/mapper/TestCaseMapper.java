@@ -33,5 +33,14 @@ public interface TestCaseMapper {
     int deleteById(String id);
 
     int count();
+
+    /**
+     * Find the maximum case number with the given prefix (e.g., "TC20251215")
+     * Returns the full case_number or null if none exists
+     * 
+     * @param prefix The prefix to search for (e.g., "TC20251215")
+     * @return The maximum case_number with that prefix, or null if none exists
+     */
+    String findMaxCaseNumberByPrefix(String prefix);
 }
 

@@ -14,6 +14,7 @@ import {
   Col,
   Statistic,
   message,
+  Rate,
 } from 'antd'
 import {
   RobotOutlined,
@@ -21,8 +22,12 @@ import {
   FileTextOutlined,
   DownOutlined,
   UpOutlined,
+  StarOutlined,
 } from '@ant-design/icons'
 import axios from 'axios'
+import * as XLSX from 'xlsx'
+import testCaseService from '../../services/testCaseService'
+import { getPriorityColor } from '../../utils/priorityUtils'
 import './SmartGenerate.css'
 
 const { TextArea } = Input
@@ -74,6 +79,12 @@ const SmartGenerate: React.FC = () => {
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set())
   const [selectedCases, setSelectedCases] = useState<Set<number>>(new Set())
   const [saving, setSaving] = useState(false)
+
+  // 反馈相关状态
+  const [feedbackRating, setFeedbackRating] = useState(0)
+  const [feedbackComments, setFeedbackComments] = useState('')
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [submittingFeedback, setSubmittingFeedback] = useState(false)
 
   // 表单初始值
   const initialValues = {
@@ -167,6 +178,65 @@ const SmartGenerate: React.FC = () => {
     setGeneratedData(null)
     setExpandedCards(new Set())
     setSelectedCases(new Set())
+    // 重置反馈状态
+    setFeedbackRating(0)
+    setFeedbackComments('')
+    setFeedbackSubmitted(false)
+  }
+
+  // 提交反馈
+  const handleSubmitFeedback = async () => {
+    if (feedbackRating === 0) {
+      message.warning('请选择评分')
+      return
+    }
+
+    if (!generatedData?.request_id) {
+      message.error('无法提交反馈：缺少请求ID')
+      return
+    }
+
+    try {
+      setSubmittingFeedback(true)
+
+      // 获取选中和未选中的用例名称
+      const acceptedCases: string[] = []
+      const rejectedCases: string[] = []
+
+      generatedData.testcases.forEach((testcase, index) => {
+        if (selectedCases.has(index)) {
+          acceptedCases.push(testcase.name)
+        } else {
+          rejectedCases.push(testcase.name)
+        }
+      })
+
+      const feedbackData = {
+        request_id: generatedData.request_id,
+        rating: feedbackRating,
+        comments: feedbackComments || undefined,
+        accepted_cases: acceptedCases.length > 0 ? acceptedCases : undefined,
+        rejected_cases: rejectedCases.length > 0 ? rejectedCases : undefined,
+      }
+
+      console.log('提交反馈:', feedbackData)
+
+      const response = await testCaseService.submitFeedback(feedbackData)
+
+      console.log('反馈响应:', response)
+
+      if (response.success || response.data) {
+        setFeedbackSubmitted(true)
+        message.success('反馈提交成功！感谢您的宝贵意见')
+      } else {
+        throw new Error('提交失败')
+      }
+    } catch (error: any) {
+      console.error('提交反馈失败:', error)
+      message.error('提交反馈失败: ' + (error.response?.data?.message || error.message))
+    } finally {
+      setSubmittingFeedback(false)
+    }
   }
 
   // 返回修改
@@ -211,17 +281,6 @@ const SmartGenerate: React.FC = () => {
     }
   }
 
-  // 转换优先级: P0->10, P1->8, P2->5, P3->3
-  const convertPriority = (priority: string): number => {
-    const priorityMap: Record<string, number> = {
-      P0: 10,
-      P1: 8,
-      P2: 5,
-      P3: 3,
-    }
-    return priorityMap[priority] || 5
-  }
-
   // 转换测试类型: 中文类型 -> 英文枚举值
   const convertType = (type: string): string => {
     const typeMap: Record<string, string> = {
@@ -240,11 +299,11 @@ const SmartGenerate: React.FC = () => {
     return typeMap[type] || 'FUNCTIONAL'
   }
 
-  // 转换测试步骤为字符串数组
+  // 转换测试步骤为JSON对象字符串数组
+  // 每个步骤转换为JSON字符串，后端的StepsTypeHandler会将其组合成JSON数组
+  // 最终数据库存储格式: [{"step": 1, "action": "...", "expected": "..."}, ...]
   const convertSteps = (steps: TestStep[]): string[] => {
-    return steps.map((step, idx) =>
-      `${idx + 1}. ${step.action} | 预期: ${step.expected}`
-    )
+    return steps.map(step => JSON.stringify(step))
   }
 
   // 保存到数据库
@@ -263,15 +322,18 @@ const SmartGenerate: React.FC = () => {
         .map((testcase) => ({
           title: testcase.name,
           description: `${testcase.type} - ${testcase.tags.join(', ')}`,
-          steps: convertSteps(testcase.steps),
+          steps: convertSteps(testcase.steps),  // JSON字符串格式
           expectedResult: testcase.steps.length > 0
             ? testcase.steps[testcase.steps.length - 1].expected
             : '测试通过',
-          priority: convertPriority(testcase.priority),
+          priority: testcase.priority,  // 保持字符串格式 (P0, P1, P2, P3)
           type: convertType(testcase.type),
           tags: testcase.tags,
           module: generatedData.metadata.module,
-          preconditions: testcase.preconditions,
+          preconditions: testcase.preconditions,  // JSON数组格式
+          quality_score: testcase.priority_score || 0.0,  // AI质量评分
+          ai_generated: true,  // 标记为AI生成
+          ai_confidence: testcase.priority_score || 0.85,  // AI置信度，使用priority_score作为置信度
         }))
 
       console.log('保存到数据库:', selectedTestCases)
@@ -288,7 +350,12 @@ const SmartGenerate: React.FC = () => {
       console.log('保存响应:', response.data)
 
       if (response.data) {
-        message.success(`成功保存 ${selectedCases.size} 条测试用例到数据库!`)
+        const savedCases = response.data.saved_cases || []
+        const caseNumbers = savedCases.map((c: any) => c.case_number).join(', ')
+        message.success(
+          `成功保存 ${selectedCases.size} 条测试用例到数据库！\n` +
+          `用例编号: ${caseNumbers}`
+        )
         // 清空选择
         setSelectedCases(new Set())
       }
@@ -300,15 +367,134 @@ const SmartGenerate: React.FC = () => {
     }
   }
 
-  // 渲染优先级标签
-  const renderPriorityTag = (priority: string) => {
-    const colorMap: Record<string, string> = {
-      P0: 'red',
-      P1: 'orange',
-      P2: 'blue',
-      P3: 'default',
+  // 导出为 Excel
+  const handleExportExcel = () => {
+    if (!generatedData?.testcases || selectedCases.size === 0) {
+      message.warning('请至少选择一个测试用例')
+      return
     }
-    return <Tag color={colorMap[priority] || 'default'}>{priority}</Tag>
+
+    try {
+      // 获取选中的测试用例
+      const selectedTestCases = generatedData.testcases
+        .filter((_, idx) => selectedCases.has(idx))
+
+      // 准备 Excel 数据
+      const excelData = selectedTestCases.map((testcase, index) => ({
+        '序号': index + 1,
+        '用例名称': testcase.name,
+        '优先级': testcase.priority,
+        '类型': testcase.type,
+        '前置条件': testcase.preconditions.join('; '),
+        '测试步骤': testcase.steps.map(s => `${s.step}. ${s.action}`).join('\n'),
+        '预期结果': testcase.steps.map(s => `${s.step}. ${s.expected}`).join('\n'),
+        '标签': testcase.tags.join(', '),
+        '优先级分数': testcase.priority_score,
+        '排名': testcase.rank || index + 1,
+      }))
+
+      // 创建工作表
+      const worksheet = XLSX.utils.json_to_sheet(excelData)
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 6 },  // 序号
+        { wch: 30 }, // 用例名称
+        { wch: 10 }, // 优先级
+        { wch: 12 }, // 类型
+        { wch: 30 }, // 前置条件
+        { wch: 40 }, // 测试步骤
+        { wch: 40 }, // 预期结果
+        { wch: 20 }, // 标签
+        { wch: 12 }, // 优先级分数
+        { wch: 8 },  // 排名
+      ]
+      worksheet['!cols'] = colWidths
+
+      // 创建工作簿
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, '测试用例')
+
+      // 生成文件名
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const fileName = `测试用例_${generatedData.metadata.module}_${timestamp}.xlsx`
+
+      // 导出文件
+      XLSX.writeFile(workbook, fileName)
+
+      message.success(`成功导出 ${selectedCases.size} 条测试用例到 Excel!`)
+    } catch (error: any) {
+      console.error('导出 Excel 失败:', error)
+      message.error('导出失败: ' + error.message)
+    }
+  }
+
+  // 导出为 JSON
+  const handleExportJSON = () => {
+    if (!generatedData?.testcases || selectedCases.size === 0) {
+      message.warning('请至少选择一个测试用例')
+      return
+    }
+
+    try {
+      // 获取选中的测试用例
+      const selectedTestCases = generatedData.testcases
+        .filter((_, idx) => selectedCases.has(idx))
+
+      // 准备导出数据
+      const exportData = {
+        metadata: {
+          export_time: new Date().toISOString(),
+          module: generatedData.metadata.module,
+          total_cases: selectedTestCases.length,
+          llm_model: generatedData.metadata.llm_model,
+        },
+        testcases: selectedTestCases.map((testcase, index) => ({
+          id: index + 1,
+          name: testcase.name,
+          priority: testcase.priority,
+          type: testcase.type,
+          preconditions: testcase.preconditions,
+          steps: testcase.steps,
+          tags: testcase.tags,
+          priority_score: testcase.priority_score,
+          rank: testcase.rank || index + 1,
+        })),
+      }
+
+      // 转换为 JSON 字符串
+      const jsonString = JSON.stringify(exportData, null, 2)
+
+      // 创建 Blob 对象
+      const blob = new Blob([jsonString], { type: 'application/json' })
+
+      // 创建下载链接
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+
+      // 生成文件名
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      link.download = `测试用例_${generatedData.metadata.module}_${timestamp}.json`
+
+      // 触发下载
+      document.body.appendChild(link)
+      link.click()
+
+      // 清理
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      message.success(`成功导出 ${selectedCases.size} 条测试用例到 JSON!`)
+    } catch (error: any) {
+      console.error('导出 JSON 失败:', error)
+      message.error('导出失败: ' + error.message)
+    }
+  }
+
+  // 渲染优先级标签 - 使用统一的颜色工具
+  const renderPriorityTag = (priority: string) => {
+    return <Tag color={getPriorityColor(priority)}>{priority}</Tag>
   }
 
   return (
@@ -478,8 +664,18 @@ const SmartGenerate: React.FC = () => {
               </Checkbox>
             </div>
             <Space>
-              <Button disabled={selectedCases.size === 0}>📥 导出Excel</Button>
-              <Button disabled={selectedCases.size === 0}>📄 导出JSON</Button>
+              <Button 
+                disabled={selectedCases.size === 0}
+                onClick={handleExportExcel}
+              >
+                📥 导出Excel
+              </Button>
+              <Button 
+                disabled={selectedCases.size === 0}
+                onClick={handleExportJSON}
+              >
+                📄 导出JSON
+              </Button>
               <Button
                 type="primary"
                 loading={saving}
@@ -637,6 +833,87 @@ const SmartGenerate: React.FC = () => {
                   </Card>
                 </Col>
               </Row>
+            </div>
+          )}
+
+          {/* 反馈 */}
+          {generatedData.testcases && generatedData.testcases.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <Card
+                title={
+                  <Space>
+                    <StarOutlined style={{ color: '#faad14' }} />
+                    <span>反馈</span>
+                    {feedbackSubmitted && (
+                      <Tag color="success" icon={<CheckCircleOutlined />}>
+                        已提交
+                      </Tag>
+                    )}
+                  </Space>
+                }
+                style={{ background: '#fafafa' }}
+              >
+                {!feedbackSubmitted ? (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ marginBottom: 8, fontSize: 14 }}>
+                        这次生成的用例质量如何？
+                      </div>
+                      <Rate
+                        value={feedbackRating}
+                        onChange={setFeedbackRating}
+                        style={{ fontSize: 28 }}
+                        character={<StarOutlined />}
+                      />
+                      {feedbackRating > 0 && (
+                        <span style={{ marginLeft: 16, color: '#8c8c8c' }}>
+                          {feedbackRating === 5 && '非常满意'}
+                          {feedbackRating === 4 && '满意'}
+                          {feedbackRating === 3 && '一般'}
+                          {feedbackRating === 2 && '不满意'}
+                          {feedbackRating === 1 && '非常不满意'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <TextArea
+                        rows={3}
+                        placeholder="可选填写评论，帮助我们改进AI生成质量..."
+                        value={feedbackComments}
+                        onChange={(e) => setFeedbackComments(e.target.value)}
+                        maxLength={500}
+                        showCount
+                      />
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <Button
+                        type="primary"
+                        icon={<StarOutlined />}
+                        onClick={handleSubmitFeedback}
+                        loading={submittingFeedback}
+                        disabled={feedbackRating === 0}
+                      >
+                        提交反馈
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <CheckCircleOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
+                    <div style={{ fontSize: 16, color: '#52c41a' }}>
+                      感谢您的反馈！您的评价将帮助我们改进AI生成质量
+                    </div>
+                    <div style={{ marginTop: 16, color: '#8c8c8c' }}>
+                      评分: <Rate disabled value={feedbackRating} style={{ fontSize: 16 }} />
+                    </div>
+                    {feedbackComments && (
+                      <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 14 }}>
+                        评论: {feedbackComments}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
             </div>
           )}
 

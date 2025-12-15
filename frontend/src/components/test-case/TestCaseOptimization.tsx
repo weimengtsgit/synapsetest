@@ -30,6 +30,7 @@ import './TestCaseOptimization.css'
 interface TestCase {
   id: string
   testcase_id: string
+  case_number: string
   title: string
   name: string
   module: string
@@ -470,7 +471,7 @@ const TestCaseOptimization: React.FC = () => {
                       }
                     />
                     <span style={{ fontWeight: 'bold' }}>
-                      {testCase.selected ? '●' : '○'} {testCase.testcase_id || testCase.id} -{' '}
+                      {testCase.selected ? '●' : '○'} {testCase.case_number || testCase.id} -{' '}
                       {testCase.title || testCase.name}
                     </span>
                   </div>

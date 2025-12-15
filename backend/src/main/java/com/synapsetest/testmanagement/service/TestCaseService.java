@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class TestCaseService {
 
     private final TestCaseMapper testCaseMapper;
+    private final CaseNumberGenerator caseNumberGenerator;
 
     /**
      * Create a new test case from request
@@ -38,6 +39,7 @@ public class TestCaseService {
 
         TestCase testCase = new TestCase();
         testCase.setId(UUID.randomUUID().toString());
+        testCase.setCaseNumber(caseNumberGenerator.generateNextCaseNumber());
         testCase.setTitle(request.getTitle());
         testCase.setDescription(request.getDescription());
         testCase.setSteps(request.getSteps());
@@ -194,15 +196,20 @@ public class TestCaseService {
 
     /**
      * Batch save test cases
+     * Returns a list of maps containing id and case_number for each saved test case
      */
-    public List<String> batchSaveTestCases(List<Map<String, Object>> testCaseMaps, String userId) {
+    public List<Map<String, String>> batchSaveTestCases(List<Map<String, Object>> testCaseMaps, String userId) {
         log.info("Batch saving {} test cases by user: {}", testCaseMaps.size(), userId);
 
-        List<String> savedIds = new ArrayList<>();
+        List<Map<String, String>> savedCases = new ArrayList<>();
 
         for (Map<String, Object> tcMap : testCaseMaps) {
             TestCase testCase = new TestCase();
-            testCase.setId(UUID.randomUUID().toString());
+            String id = UUID.randomUUID().toString();
+            String caseNumber = caseNumberGenerator.generateNextCaseNumber();
+            
+            testCase.setId(id);
+            testCase.setCaseNumber(caseNumber);
 
             // Support both "title" and "case_name"
             String title = (String) tcMap.get("title");
@@ -214,11 +221,13 @@ public class TestCaseService {
             testCase.setDescription((String) tcMap.getOrDefault("description", ""));
 
             // Parse steps - could be a List or a String
+            // Each element should be a JSON object string like {"step":1,"action":"...","expected":"..."}
             Object stepsObj = tcMap.get("steps");
             if (stepsObj instanceof List) {
+                // Already a list, use it directly
                 testCase.setSteps((List<String>) stepsObj);
             } else if (stepsObj instanceof String) {
-                // If it's a string, wrap it in a list
+                // Single string, wrap in a list
                 testCase.setSteps(Collections.singletonList((String) stepsObj));
             }
 
@@ -233,14 +242,23 @@ public class TestCaseService {
                 testCase.setExpectedResult((String) expectedResultObj);
             }
 
-            // Parse priority - could be Integer or String
+            // Parse priority - could be Integer or String (including P0/P1/P2/P3 format)
             Object priorityObj = tcMap.getOrDefault("priority", "5");
             int priority;
             if (priorityObj instanceof Integer) {
                 priority = (Integer) priorityObj;
             } else if (priorityObj instanceof String) {
                 String priorityStr = (String) priorityObj;
-                if ("HIGH".equalsIgnoreCase(priorityStr)) {
+                // Handle P0/P1/P2/P3 format
+                if ("P0".equalsIgnoreCase(priorityStr)) {
+                    priority = 10;  // P0 = Highest priority
+                } else if ("P1".equalsIgnoreCase(priorityStr)) {
+                    priority = 8;
+                } else if ("P2".equalsIgnoreCase(priorityStr)) {
+                    priority = 5;
+                } else if ("P3".equalsIgnoreCase(priorityStr)) {
+                    priority = 3;
+                } else if ("HIGH".equalsIgnoreCase(priorityStr)) {
                     priority = 8;
                 } else if ("MEDIUM".equalsIgnoreCase(priorityStr)) {
                     priority = 5;
@@ -249,7 +267,12 @@ public class TestCaseService {
                 } else if ("CRITICAL".equalsIgnoreCase(priorityStr)) {
                     priority = 10;
                 } else {
-                    priority = Integer.parseInt(priorityStr);
+                    try {
+                        priority = Integer.parseInt(priorityStr);
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid priority format: {}, using default 5", priorityStr);
+                        priority = 5;
+                    }
                 }
             } else {
                 priority = 5;
@@ -275,17 +298,57 @@ public class TestCaseService {
                 testCase.setPreconditions((List<String>) preconditionsObj);
             }
 
-            testCase.setRelatedRequirement((String) tcMap.getOrDefault("module", ""));
+            // Set related_requirement from the correct field (not from module)
+            testCase.setRelatedRequirement((String) tcMap.get("related_requirement"));
+            
+            // Parse quality_score
+            Object qualityScoreObj = tcMap.get("quality_score");
+            if (qualityScoreObj != null) {
+                if (qualityScoreObj instanceof Double) {
+                    testCase.setQualityScore(((Double) qualityScoreObj).floatValue());
+                } else if (qualityScoreObj instanceof Float) {
+                    testCase.setQualityScore((Float) qualityScoreObj);
+                } else if (qualityScoreObj instanceof Number) {
+                    testCase.setQualityScore(((Number) qualityScoreObj).floatValue());
+                }
+            }
+            
+            // Parse ai_generated
+            Object aiGeneratedObj = tcMap.get("ai_generated");
+            if (aiGeneratedObj instanceof Boolean) {
+                testCase.setAiGenerated((Boolean) aiGeneratedObj);
+            } else if (aiGeneratedObj != null) {
+                testCase.setAiGenerated(Boolean.parseBoolean(aiGeneratedObj.toString()));
+            }
+            
+            // Parse ai_confidence
+            Object aiConfidenceObj = tcMap.get("ai_confidence");
+            if (aiConfidenceObj != null) {
+                if (aiConfidenceObj instanceof Double) {
+                    testCase.setAiConfidence(((Double) aiConfidenceObj).floatValue());
+                } else if (aiConfidenceObj instanceof Float) {
+                    testCase.setAiConfidence((Float) aiConfidenceObj);
+                } else if (aiConfidenceObj instanceof Number) {
+                    testCase.setAiConfidence(((Number) aiConfidenceObj).floatValue());
+                }
+            }
+            
             testCase.setCreatedBy(userId);
             testCase.setCreatedAt(LocalDateTime.now());
             testCase.setUpdatedAt(LocalDateTime.now());
 
             testCaseMapper.insert(testCase);
-            savedIds.add(testCase.getId());
+            
+            // Add both id and case_number to result
+            Map<String, String> savedCase = Map.of(
+                "id", id,
+                "case_number", caseNumber
+            );
+            savedCases.add(savedCase);
         }
 
-        log.info("Batch saved {} test cases successfully", savedIds.size());
-        return savedIds;
+        log.info("Batch saved {} test cases successfully", savedCases.size());
+        return savedCases;
     }
 
     /**
@@ -338,6 +401,7 @@ public class TestCaseService {
     private TestCaseResponse convertToResponse(TestCase testCase) {
         TestCaseResponse response = new TestCaseResponse();
         response.setId(testCase.getId());
+        response.setCaseNumber(testCase.getCaseNumber());
         response.setTitle(testCase.getTitle());
         response.setCaseName(testCase.getTitle()); // 设置caseName字段，使用与title相同的值
         response.setDescription(testCase.getDescription());

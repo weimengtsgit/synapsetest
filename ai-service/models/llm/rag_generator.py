@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 import logging
 import json
 import time
+import re
 
 from models.llm.qwen_model import create_llm_model
 from models.optimization.deduplicator import SemanticDeduplicator
@@ -339,6 +340,12 @@ class RAGTestCaseGenerator:
             # Check required fields
             if not tc.get('name'):
                 logger.warning("Skipping test case without name")
+                continue
+
+            # Validate that name is in Chinese (no English letters)
+            name = tc.get('name', '')
+            if re.search(r'[a-zA-Z]', name):
+                logger.warning(f"⚠️  跳过包含英文的测试用例名称: {name}")
                 continue
 
             if not tc.get('steps'):

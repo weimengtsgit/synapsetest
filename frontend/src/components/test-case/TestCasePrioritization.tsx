@@ -19,6 +19,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons'
 import testCaseService from '../../services/testCaseService'
+import { convertPriorityToLabel, getPriorityColor } from '../../utils/priorityUtils'
 import './TestCaseOptimization.css'
 
 interface PrioritizedTestCase {
@@ -212,11 +213,10 @@ const TestCasePrioritization: React.FC = () => {
       dataIndex: 'priority',
       key: 'priority',
       width: 100,
-      render: (priority: number) => (
-        <Tag color={priority >= 8 ? 'red' : priority >= 5 ? 'orange' : 'default'}>
-          P{priority || 3}
-        </Tag>
-      ),
+      render: (priority: number) => {
+        const label = convertPriorityToLabel(priority)
+        return <Tag color={getPriorityColor(priority)}>{label}</Tag>
+      },
     },
   ]
 
