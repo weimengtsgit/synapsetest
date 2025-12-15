@@ -152,6 +152,17 @@ public class TestCaseController {
     }
 
     /**
+     * Get all distinct modules
+     * GET /api/v1/test-cases/modules
+     */
+    @Operation(summary = "获取所有模块列表", description = "获取系统中所有不重复的模块名称列表")
+    @GetMapping("/modules")
+    public ResponseEntity<ApiResponse<List<String>>> getAllModules() {
+        List<String> modules = testCaseService.getAllModules();
+        return ResponseEntity.ok(ApiResponse.success(modules));
+    }
+
+    /**
      * Get test cases by status
      * GET /api/v1/test-cases?status=DRAFT
      */

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Card,
   Row,
@@ -22,40 +22,86 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
 } from '@ant-design/icons'
+import testCaseService from '../../services/testCaseService'
+import TestCasePrioritization from './TestCasePrioritization'
+import TestCaseQualityAnalysis from './TestCaseQualityAnalysis'
 import './TestCaseOptimization.css'
+
+interface TestCase {
+  id: string
+  testcase_id: string
+  title: string
+  name: string
+  module: string
+  type: string
+  priority: string
+  description: string
+  steps: any[]
+  preconditions: any[]
+  expected_result: string
+  quality_score: number
+  last_executed: string
+  defects_found: number
+  selected: boolean
+  similarity: number
+}
 
 interface DuplicateGroup {
   id: number
   similarity: number
-  cases: Array<{
-    id: string
-    title: string
-    qualityScore: number
-    lastExecuted: string
-    defectsFound: number
-    selected: boolean
-  }>
+  cases: TestCase[]
   reason: string
 }
 
+interface Statistics {
+  original_count: number
+  unique_count: number
+  duplicate_count: number
+  duplicate_groups: number
+  time_saved_hours: number
+}
+
 const TestCaseOptimization: React.FC = () => {
+  const [activeFeature, setActiveFeature] = useState<string>('dedup') // 'dedup', 'prioritize', 'quality'
   const [scope, setScope] = useState<string>('module')
-  const [selectedModules, setSelectedModules] = useState<string[]>(['用户认证', '支付系统'])
+  const [modules, setModules] = useState<string[]>([])
+  const [selectedModules, setSelectedModules] = useState<string[]>([])
   const [similarityThreshold, setSimilarityThreshold] = useState<number>(85)
   const [analyzing, setAnalyzing] = useState<boolean>(false)
   const [showResults, setShowResults] = useState<boolean>(false)
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([])
+  const [stats, setStats] = useState<Statistics | null>(null)
+  const [allTestCases, setAllTestCases] = useState<any[]>([])
 
-  // Mock modules
-  const modules = ['用户认证', '支付系统', '订单中心', '搜索引擎']
+  // Load modules and test cases on mount
+  useEffect(() => {
+    loadModules()
+    loadTestCases()
+  }, [])
 
-  // Statistics
-  const [stats] = useState({
-    originalCount: 328,
-    duplicateCount: 23,
-    optimizedCount: 305,
-    timeSaved: 2.5,
-  })
+  const loadModules = async () => {
+    try {
+      const response = await testCaseService.getAllModules()
+      if (response.success && response.data) {
+        setModules(response.data)
+      }
+    } catch (error: any) {
+      console.error('Failed to load modules:', error)
+      message.error('加载模块列表失败: ' + (error.message || '未知错误'))
+    }
+  }
+
+  const loadTestCases = async () => {
+    try {
+      const response = await testCaseService.getAllTestCases()
+      if (response.success && response.data) {
+        setAllTestCases(response.data.content || response.data)
+      }
+    } catch (error: any) {
+      console.error('Failed to load test cases:', error)
+      message.error('加载测试用例失败: ' + (error.message || '未知错误'))
+    }
+  }
 
   const handleScopeChange = (e: RadioChangeEvent) => {
     setScope(e.target.value)
@@ -71,68 +117,40 @@ const TestCaseOptimization: React.FC = () => {
       return
     }
 
+    if (allTestCases.length === 0) {
+      message.warning('没有可分析的测试用例')
+      return
+    }
+
     setAnalyzing(true)
-    message.loading('正在分析测试用例...', 0)
+    const loadingMsg = message.loading('正在分析测试用例...', 0)
 
-    // Simulate API call
-    setTimeout(() => {
-      message.destroy()
+    try {
+      const response = await testCaseService.analyzeDeduplication({
+        testcases: allTestCases,
+        threshold: similarityThreshold / 100,  // Convert percentage to decimal
+        scope: scope,
+        modules: selectedModules
+      })
 
-      // Mock duplicate groups data
-      const mockGroups: DuplicateGroup[] = [
-        {
-          id: 1,
-          similarity: 92,
-          cases: [
-            {
-              id: 'TC001',
-              title: '手机号+验证码正常登录',
-              qualityScore: 95,
-              lastExecuted: '2天前',
-              defectsFound: 2,
-              selected: true,
-            },
-            {
-              id: 'TC015',
-              title: '测试用户登录功能',
-              qualityScore: 78,
-              lastExecuted: '15天前',
-              defectsFound: 0,
-              selected: false,
-            },
-          ],
-          reason: '测试步骤80%相似，预期结果完全一致',
-        },
-        {
-          id: 2,
-          similarity: 88,
-          cases: [
-            {
-              id: 'TC102',
-              title: '支付订单测试',
-              qualityScore: 90,
-              lastExecuted: '1天前',
-              defectsFound: 1,
-              selected: true,
-            },
-            {
-              id: 'TC210',
-              title: '验证订单支付流程',
-              qualityScore: 82,
-              lastExecuted: '7天前',
-              defectsFound: 0,
-              selected: false,
-            },
-          ],
-          reason: '测试步骤75%相似，覆盖场景重叠',
-        },
-      ]
+      loadingMsg()
 
-      setDuplicateGroups(mockGroups)
-      setShowResults(true)
+      if (response.success) {
+        const data = response.data || response
+        setStats(data.statistics)
+        setDuplicateGroups(data.duplicate_groups || [])
+        setShowResults(true)
+        message.success(`分析完成！发现 ${data.statistics.duplicate_groups} 组重复用例`)
+      } else {
+        message.error('分析失败: ' + (response.message || '未知错误'))
+      }
+    } catch (error: any) {
+      loadingMsg()
+      console.error('Analysis failed:', error)
+      message.error('分析失败: ' + (error.message || '未知错误'))
+    } finally {
       setAnalyzing(false)
-      message.success('分析完成！')
-    }, 2000)
+    }
   }
 
   const handleKeepAll = () => {
@@ -166,7 +184,7 @@ const TestCaseOptimization: React.FC = () => {
           ...group,
           cases: group.cases.map((c) => ({
             ...c,
-            selected: c.id === caseId,
+            selected: c.id === caseId || c.testcase_id === caseId,
           })),
         }
       }
@@ -175,16 +193,58 @@ const TestCaseOptimization: React.FC = () => {
     setDuplicateGroups(updatedGroups)
   }
 
-  const handleConfirmOptimization = () => {
-    // Calculate how many cases will be removed
-    const toRemove = duplicateGroups.reduce(
-      (acc, group) => acc + group.cases.filter((c) => !c.selected).length,
-      0
+  const handleConfirmOptimization = async () => {
+    // Collect IDs of cases to delete (not selected)
+    const toDeleteIds = duplicateGroups.flatMap((group) =>
+      group.cases.filter((c) => !c.selected).map((c) => c.id || c.testcase_id)
     )
 
-    message.success(`优化成功！已删除 ${toRemove} 个重复用例`)
-    setShowResults(false)
-    setDuplicateGroups([])
+    if (toDeleteIds.length === 0) {
+      message.warning('没有需要删除的重复用例')
+      setShowResults(false)
+      setDuplicateGroups([])
+      setStats(null)
+      return
+    }
+
+    try {
+      const loadingMsg = message.loading(`正在删除 ${toDeleteIds.length} 个重复用例...`, 0)
+
+      // Delete test cases one by one
+      let successCount = 0
+      let failCount = 0
+
+      for (const id of toDeleteIds) {
+        try {
+          await testCaseService.deleteTestCase(id)
+          successCount++
+        } catch (error) {
+          console.error(`Failed to delete test case ${id}:`, error)
+          failCount++
+        }
+      }
+
+      loadingMsg()
+
+      if (successCount > 0) {
+        message.success(
+          `优化完成！成功删除 ${successCount} 个重复用例` +
+            (failCount > 0 ? `，${failCount} 个删除失败` : '')
+        )
+      } else {
+        message.error('删除失败，请重试')
+      }
+
+      setShowResults(false)
+      setDuplicateGroups([])
+      setStats(null)
+
+      // Reload test cases
+      await loadTestCases()
+    } catch (error: any) {
+      console.error('Optimization failed:', error)
+      message.error('优化失败: ' + (error.message || '未知错误'))
+    }
   }
 
   return (
@@ -198,8 +258,14 @@ const TestCaseOptimization: React.FC = () => {
         <Col span={8}>
           <Card
             className="quick-action-card"
-            style={{ background: '#e6f7ff', borderColor: '#91d5ff' }}
+            style={{
+              background: activeFeature === 'dedup' ? '#e6f7ff' : '#fafafa',
+              borderColor: activeFeature === 'dedup' ? '#1890ff' : '#d9d9d9',
+              borderWidth: activeFeature === 'dedup' ? 2 : 1,
+              cursor: 'pointer'
+            }}
             hoverable
+            onClick={() => setActiveFeature('dedup')}
           >
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <ReloadOutlined style={{ fontSize: 32, color: '#1890ff', marginRight: 16 }} />
@@ -217,8 +283,14 @@ const TestCaseOptimization: React.FC = () => {
         <Col span={8}>
           <Card
             className="quick-action-card"
-            style={{ background: '#f6ffed', borderColor: '#b7eb8f' }}
+            style={{
+              background: activeFeature === 'prioritize' ? '#f6ffed' : '#fafafa',
+              borderColor: activeFeature === 'prioritize' ? '#52c41a' : '#d9d9d9',
+              borderWidth: activeFeature === 'prioritize' ? 2 : 1,
+              cursor: 'pointer'
+            }}
             hoverable
+            onClick={() => setActiveFeature('prioritize')}
           >
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <BarChartOutlined style={{ fontSize: 32, color: '#52c41a', marginRight: 16 }} />
@@ -236,8 +308,14 @@ const TestCaseOptimization: React.FC = () => {
         <Col span={8}>
           <Card
             className="quick-action-card"
-            style={{ background: '#fff7e6', borderColor: '#ffd591' }}
+            style={{
+              background: activeFeature === 'quality' ? '#fff7e6' : '#fafafa',
+              borderColor: activeFeature === 'quality' ? '#fa8c16' : '#d9d9d9',
+              borderWidth: activeFeature === 'quality' ? 2 : 1,
+              cursor: 'pointer'
+            }}
             hoverable
+            onClick={() => setActiveFeature('quality')}
           >
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <LineChartOutlined style={{ fontSize: 32, color: '#fa8c16', marginRight: 16 }} />
@@ -254,13 +332,16 @@ const TestCaseOptimization: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Smart Deduplication Form */}
-      <Card title="智能去重 (Smart Deduplication)" style={{ marginBottom: 24 }}>
+      {/* Feature Content - Smart Deduplication */}
+      {activeFeature === 'dedup' && (
+        <>
+          {/* Smart Deduplication Form */}
+          <Card title="智能去重 (Smart Deduplication)" style={{ marginBottom: 24 }}>
         <div style={{ marginBottom: 24 }}>
           <div style={{ marginBottom: 12, fontWeight: 'bold' }}>选择用例范围</div>
           <Radio.Group onChange={handleScopeChange} value={scope}>
             <Space direction="vertical">
-              <Radio value="all">全部用例</Radio>
+              <Radio value="all">全部用例 ({allTestCases.length} 条)</Radio>
               <Radio value="module">指定模块</Radio>
               <Radio value="selected">选中的用例</Radio>
             </Space>
@@ -269,12 +350,18 @@ const TestCaseOptimization: React.FC = () => {
 
         {scope === 'module' && (
           <div style={{ marginBottom: 24 }}>
-            <div style={{ marginBottom: 12, fontWeight: 'bold' }}>模块选择</div>
-            <Checkbox.Group
-              options={modules}
-              value={selectedModules}
-              onChange={(checkedValues) => handleModuleChange(checkedValues as string[])}
-            />
+            <div style={{ marginBottom: 12, fontWeight: 'bold' }}>
+              模块选择 {modules.length > 0 && `(共 ${modules.length} 个模块)`}
+            </div>
+            {modules.length > 0 ? (
+              <Checkbox.Group
+                options={modules}
+                value={selectedModules}
+                onChange={(checkedValues) => handleModuleChange(checkedValues as string[])}
+              />
+            ) : (
+              <div style={{ color: '#8c8c8c' }}>暂无可用模块</div>
+            )}
           </div>
         )}
 
@@ -298,22 +385,33 @@ const TestCaseOptimization: React.FC = () => {
           </div>
         </div>
 
-        <Button type="primary" onClick={handleAnalyze} loading={analyzing}>
+        <Button
+          type="primary"
+          onClick={handleAnalyze}
+          loading={analyzing}
+          disabled={allTestCases.length === 0}
+        >
           开始分析
         </Button>
       </Card>
 
       {/* Deduplication Results */}
-      {showResults && (
+      {showResults && stats && (
         <Card title="去重结果 (Deduplication Results)">
           <Alert
             message="分析完成！"
             description={
               <div>
-                <div>• 原始用例数: {stats.originalCount} 条</div>
-                <div>• 重复用例数: {stats.duplicateCount} 条 ({Math.round((stats.duplicateCount / stats.originalCount) * 100)}%)</div>
-                <div>• 优化后数量: {stats.optimizedCount} 条</div>
-                <div>• 节省工作量: 约 {stats.timeSaved} 小时</div>
+                <div>• 原始用例数: {stats.original_count} 条</div>
+                <div>
+                  • 重复用例数: {stats.duplicate_count} 条 (
+                  {stats.original_count > 0
+                    ? Math.round((stats.duplicate_count / stats.original_count) * 100)
+                    : 0}
+                  %)
+                </div>
+                <div>• 优化后数量: {stats.unique_count} 条</div>
+                <div>• 节省工作量: 约 {stats.time_saved_hours} 小时</div>
               </div>
             }
             type="success"
@@ -321,13 +419,22 @@ const TestCaseOptimization: React.FC = () => {
             style={{ marginBottom: 16 }}
           />
 
-          <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div
+            style={{
+              marginBottom: 16,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
             <div style={{ fontWeight: 'bold' }}>
               重复用例详情 (发现 {duplicateGroups.length} 组)
             </div>
             <Space>
               <Button onClick={handleKeepAll}>全部保留第一个</Button>
-              <Button onClick={handleDeleteAll} danger>全部删除重复</Button>
+              <Button onClick={handleDeleteAll} danger>
+                全部删除重复
+              </Button>
             </Space>
           </div>
 
@@ -344,26 +451,34 @@ const TestCaseOptimization: React.FC = () => {
             >
               {group.cases.map((testCase) => (
                 <div
-                  key={testCase.id}
+                  key={testCase.id || testCase.testcase_id}
                   style={{
                     background: testCase.selected ? '#e6f7ff' : '#fff1f0',
                     padding: 12,
                     borderRadius: 4,
                     marginBottom: 8,
-                    borderLeft: testCase.selected ? '4px solid #1890ff' : '4px solid #f5222d',
+                    borderLeft: testCase.selected
+                      ? '4px solid #1890ff'
+                      : '4px solid #f5222d',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <Radio
                       checked={testCase.selected}
-                      onChange={() => handleSelectCase(group.id, testCase.id)}
+                      onChange={() =>
+                        handleSelectCase(group.id, testCase.id || testCase.testcase_id)
+                      }
                     />
                     <span style={{ fontWeight: 'bold' }}>
-                      {testCase.selected ? '●' : '○'} {testCase.id} - {testCase.title}
+                      {testCase.selected ? '●' : '○'} {testCase.testcase_id || testCase.id} -{' '}
+                      {testCase.title || testCase.name}
                     </span>
                   </div>
-                  <div style={{ color: '#595959', fontSize: 12, marginBottom: 8, marginLeft: 24 }}>
-                    质量分数: {testCase.qualityScore}分 | 最近执行: {testCase.lastExecuted} | 发现缺陷: {testCase.defectsFound}个
+                  <div
+                    style={{ color: '#595959', fontSize: 12, marginBottom: 8, marginLeft: 24 }}
+                  >
+                    质量分数: {testCase.quality_score}分 | 最近执行: {testCase.last_executed} |
+                    发现缺陷: {testCase.defects_found}个
                   </div>
                   <div style={{ marginLeft: 24 }}>
                     {testCase.selected ? (
@@ -405,6 +520,14 @@ const TestCaseOptimization: React.FC = () => {
           </div>
         </Card>
       )}
+        </>
+      )}
+
+      {/* Feature Content - Priority Ranking */}
+      {activeFeature === 'prioritize' && <TestCasePrioritization />}
+
+      {/* Feature Content - Quality Analysis */}
+      {activeFeature === 'quality' && <TestCaseQualityAnalysis />}
     </div>
   )
 }

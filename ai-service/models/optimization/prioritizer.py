@@ -150,6 +150,56 @@ class TestCasePrioritizer:
 
         return score
 
+    def _parse_steps(self, steps: Any) -> List[Dict[str, Any]]:
+        """
+        Parse steps field which may be in different formats
+
+        Args:
+            steps: Steps data (may be list of dicts, list of JSON strings, or JSON string)
+
+        Returns:
+            List of step dictionaries
+        """
+        import json
+
+        if not steps:
+            return []
+
+        parsed_steps = []
+
+        if isinstance(steps, str):
+            # Single JSON string
+            try:
+                parsed = json.loads(steps)
+                if isinstance(parsed, list):
+                    return self._parse_steps(parsed)
+                elif isinstance(parsed, dict):
+                    return [parsed]
+            except (json.JSONDecodeError, TypeError):
+                return [{'action': steps}]
+
+        if isinstance(steps, list):
+            for step in steps:
+                if isinstance(step, str):
+                    try:
+                        # Try to parse JSON string
+                        parsed = json.loads(step)
+                        if isinstance(parsed, list):
+                            parsed_steps.extend(parsed)
+                        elif isinstance(parsed, dict):
+                            parsed_steps.append(parsed)
+                        else:
+                            parsed_steps.append({'action': str(parsed)})
+                    except (json.JSONDecodeError, TypeError):
+                        # If not JSON, treat as plain text
+                        parsed_steps.append({'action': step})
+                elif isinstance(step, dict):
+                    parsed_steps.append(step)
+                else:
+                    parsed_steps.append({'action': str(step)})
+
+        return parsed_steps
+
     def _get_execution_cost_score(self, testcase: Dict[str, Any]) -> float:
         """
         Calculate execution cost score
@@ -157,7 +207,8 @@ class TestCasePrioritizer:
         Lower cost = higher score (we prefer cheaper tests when other factors equal)
         """
         steps = testcase.get('steps', [])
-        num_steps = len(steps)
+        parsed_steps = self._parse_steps(steps)
+        num_steps = len(parsed_steps)
 
         # Inverse relationship: more steps = lower score
         if num_steps == 0:
@@ -198,6 +249,7 @@ class TestCasePrioritizer:
         """
         tags = testcase.get('tags', [])
         steps = testcase.get('steps', [])
+        parsed_steps = self._parse_steps(steps)
 
         # Base score from test type
         test_type = testcase.get('type', '')
@@ -214,8 +266,8 @@ class TestCasePrioritizer:
 
         # Bonus for multiple assertions (steps with expected results)
         expected_count = sum(
-            1 for step in steps
-            if step.get('expected', '')
+            1 for step in parsed_steps
+            if isinstance(step, dict) and step.get('expected', '')
         )
         if expected_count >= 5:
             base_score = min(1.0, base_score + 0.1)
@@ -230,29 +282,14 @@ class TestCasePrioritizer:
             testcase: Test case dictionary
 
         Returns:
-            Dictionary with individual factor scores
+            Dictionary with individual factor scores (normalized 0-1)
         """
         return {
-            'business_value': {
-                'score': self._get_business_value_score(testcase),
-                'weight': self.weights['business_value']
-            },
-            'risk_level': {
-                'score': self._get_risk_score(testcase),
-                'weight': self.weights['risk_level']
-            },
-            'execution_cost': {
-                'score': self._get_execution_cost_score(testcase),
-                'weight': self.weights['execution_cost']
-            },
-            'failure_history': {
-                'score': self._get_failure_history_score(testcase),
-                'weight': self.weights['failure_history']
-            },
-            'coverage_impact': {
-                'score': self._get_coverage_impact_score(testcase),
-                'weight': self.weights['coverage_impact']
-            }
+            'business_value': self._get_business_value_score(testcase),
+            'risk_level': self._get_risk_score(testcase),
+            'execution_cost': self._get_execution_cost_score(testcase),
+            'failure_history': self._get_failure_history_score(testcase),
+            'coverage_impact': self._get_coverage_impact_score(testcase)
         }
 
     def adjust_weights(self, new_weights: Dict[str, float]):

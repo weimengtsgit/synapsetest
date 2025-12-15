@@ -48,13 +48,15 @@ class SemanticDeduplicator:
         try:
             from sentence_transformers import SentenceTransformer
 
+            logger.info("Loading Sentence-BERT model 'paraphrase-multilingual-mpnet-base-v2'...")
             self.model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2')
-            logger.info("Sentence-BERT model loaded successfully")
-        except ImportError:
-            logger.warning("sentence-transformers not available, using fallback")
+            logger.info("✅ Sentence-BERT model loaded successfully")
+        except ImportError as e:
+            logger.warning(f"sentence-transformers not available (ImportError: {e}), using fallback")
             self.model = None
         except Exception as e:
-            logger.error(f"Failed to load Sentence-BERT: {e}")
+            logger.error(f"Failed to load Sentence-BERT: {type(e).__name__}: {e}")
+            logger.warning("Falling back to text-based deduplication")
             self.model = None
 
     def deduplicate(
@@ -101,9 +103,37 @@ class SemanticDeduplicator:
 
     def _extract_case_text(self, testcase: Dict[str, Any]) -> str:
         """Extract text representation of test case"""
-        name = testcase.get('name', '')
+        import json
+
+        name = testcase.get('name', '') or testcase.get('title', '')
         steps = testcase.get('steps', [])
-        step_texts = [s.get('action', '') for s in steps]
+
+        # Parse steps if they are JSON strings
+        parsed_steps = []
+        if isinstance(steps, list):
+            for step in steps:
+                if isinstance(step, str):
+                    try:
+                        # Try to parse JSON string
+                        parsed = json.loads(step)
+                        if isinstance(parsed, list):
+                            parsed_steps.extend(parsed)
+                        elif isinstance(parsed, dict):
+                            parsed_steps.append(parsed)
+                    except (json.JSONDecodeError, TypeError):
+                        # If not JSON, treat as plain text
+                        parsed_steps.append({'action': step})
+                elif isinstance(step, dict):
+                    parsed_steps.append(step)
+
+        # Extract action text from steps
+        step_texts = []
+        for s in parsed_steps:
+            if isinstance(s, dict):
+                action = s.get('action', '') or s.get('step', '') or str(s)
+                step_texts.append(str(action))
+            else:
+                step_texts.append(str(s))
 
         combined = f"{name} {' '.join(step_texts)}"
         return combined
@@ -148,10 +178,14 @@ class SemanticDeduplicator:
                 unique_cases.append(best_case)
 
                 # Record duplicate group
+                # Support both 'name' and 'caseName' fields
+                def get_case_name(case):
+                    return case.get('name') or case.get('caseName') or case.get('title', 'Unknown')
+
                 duplicate_groups.append({
-                    'representative': best_case.get('name', 'Unknown'),
+                    'representative': get_case_name(best_case),
                     'duplicates': [
-                        testcases[j].get('name', 'Unknown')
+                        get_case_name(testcases[j])
                         for j in similar_indices if j != i
                     ],
                     'similarity_scores': [
@@ -178,9 +212,13 @@ class SemanticDeduplicator:
         """
         scores = []
         for case in similar_cases:
+            # Handle None values explicitly to avoid "len() of NoneType" errors
+            steps = case.get('steps') or []
+            preconditions = case.get('preconditions') or []
+
             score = (
-                len(case.get('steps', [])) * 2.0 +
-                len(case.get('preconditions', [])) * 1.5 +
+                len(steps) * 2.0 +
+                len(preconditions) * 1.5 +
                 self._priority_score(case.get('priority', 'P3')) * 3.0
             )
             scores.append(score)
@@ -232,15 +270,54 @@ class SemanticDeduplicator:
 
     def _compare_steps(self, case1: Dict[str, Any], case2: Dict[str, Any]) -> bool:
         """Compare if two cases have similar steps"""
+        import json
+
         steps1 = case1.get('steps', [])
         steps2 = case2.get('steps', [])
 
-        if len(steps1) != len(steps2):
+        # Parse steps if they are JSON strings
+        parsed_steps1 = []
+        if isinstance(steps1, list):
+            for step in steps1:
+                if isinstance(step, str):
+                    try:
+                        parsed = json.loads(step)
+                        if isinstance(parsed, list):
+                            parsed_steps1.extend(parsed)
+                        elif isinstance(parsed, dict):
+                            parsed_steps1.append(parsed)
+                    except (json.JSONDecodeError, TypeError):
+                        parsed_steps1.append({'action': step})
+                elif isinstance(step, dict):
+                    parsed_steps1.append(step)
+
+        parsed_steps2 = []
+        if isinstance(steps2, list):
+            for step in steps2:
+                if isinstance(step, str):
+                    try:
+                        parsed = json.loads(step)
+                        if isinstance(parsed, list):
+                            parsed_steps2.extend(parsed)
+                        elif isinstance(parsed, dict):
+                            parsed_steps2.append(parsed)
+                    except (json.JSONDecodeError, TypeError):
+                        parsed_steps2.append({'action': step})
+                elif isinstance(step, dict):
+                    parsed_steps2.append(step)
+
+        if len(parsed_steps1) != len(parsed_steps2):
             return False
 
-        for s1, s2 in zip(steps1, steps2):
-            if s1.get('action', '') != s2.get('action', ''):
-                return False
+        for s1, s2 in zip(parsed_steps1, parsed_steps2):
+            if isinstance(s1, dict) and isinstance(s2, dict):
+                action1 = s1.get('action', '') or str(s1)
+                action2 = s2.get('action', '') or str(s2)
+                if action1 != action2:
+                    return False
+            else:
+                if str(s1) != str(s2):
+                    return False
 
         return True
 
