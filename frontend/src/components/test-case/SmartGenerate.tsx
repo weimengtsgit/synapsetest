@@ -15,6 +15,7 @@ import {
   Statistic,
   message,
   Rate,
+  Select,
 } from 'antd'
 import {
   RobotOutlined,
@@ -27,7 +28,7 @@ import {
 import axios from 'axios'
 import * as XLSX from 'xlsx'
 import testCaseService from '../../services/testCaseService'
-import { getPriorityColor } from '../../utils/priorityUtils'
+import { getPriorityColor, convertPriorityToLabel } from '../../utils/priorityUtils'
 import './SmartGenerate.css'
 
 const { TextArea } = Input
@@ -54,9 +55,12 @@ interface GenerateResponse {
   total_generated: number
   total_unique: number
   total_duplicates: number
+  total_after_optimization?: number  // 优化后的数量
+  total_filtered?: number            // 被过滤掉的数量
   testcases: TestCase[]
   request_id: string
   timestamp: string
+  optimized?: boolean
   metadata: {
     module: string
     num_requested: number
@@ -99,6 +103,8 @@ const SmartGenerate: React.FC = () => {
     include_edge_cases: true,
     deduplicate: true,
     prioritize: true,
+    min_priority: 'P1',
+    max_cases: 20,
   }
 
   // 开始生成
@@ -129,8 +135,8 @@ const SmartGenerate: React.FC = () => {
         optimization: {
           deduplicate: values.deduplicate,
           prioritize: values.prioritize,
-          min_priority: 'P1',
-          max_cases: 20,
+          min_priority: values.min_priority || 'P1',
+          max_cases: values.max_cases || 20,
         },
       }
 
@@ -492,9 +498,12 @@ const SmartGenerate: React.FC = () => {
     }
   }
 
-  // 渲染优先级标签 - 使用统一的颜色工具
-  const renderPriorityTag = (priority: string) => {
-    return <Tag color={getPriorityColor(priority)}>{priority}</Tag>
+  // 渲染优先级标签 - 统一转换：支持数字（0-10）和字符串（P0-P3）两种格式
+  const renderPriorityTag = (priority: string | number) => {
+    const label = typeof priority === 'number' 
+      ? convertPriorityToLabel(priority) 
+      : priority
+    return <Tag color={getPriorityColor(priority)}>{label}</Tag>
   }
 
   return (
@@ -574,13 +583,46 @@ const SmartGenerate: React.FC = () => {
             </Form.Item>
 
             <Form.Item label="高级配置（可选）">
-              <Space direction="vertical">
+              <Space direction="vertical" style={{ width: '100%' }}>
                 <Form.Item name="deduplicate" valuePropName="checked" noStyle>
                   <Checkbox>自动去重（相似度阈值: 85%）</Checkbox>
                 </Form.Item>
                 <Form.Item name="prioritize" valuePropName="checked" noStyle>
                   <Checkbox>自动优先级排序</Checkbox>
                 </Form.Item>
+
+                <Row gutter={16} style={{ width: '100%', marginTop: 8 }}>
+                  <Col span={12}>
+                    <Form.Item
+                      name="min_priority"
+                      label="最低优先级"
+                      tooltip="只保留此优先级及以上的用例"
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Select placeholder="选择最低优先级">
+                        <Select.Option value="P0">P0（最高）</Select.Option>
+                        <Select.Option value="P1">P1（高）</Select.Option>
+                        <Select.Option value="P2">P2（中）</Select.Option>
+                        <Select.Option value="P3">P3（低）</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item
+                      name="max_cases"
+                      label="最大用例数"
+                      tooltip="优化后返回的最大用例数量"
+                      style={{ marginBottom: 0 }}
+                    >
+                      <InputNumber
+                        min={1}
+                        max={100}
+                        style={{ width: '100%' }}
+                        placeholder="默认20"
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
               </Space>
             </Form.Item>
 
@@ -633,22 +675,25 @@ const SmartGenerate: React.FC = () => {
       {/* 第3步：查看结果 */}
       {currentStep === 2 && generatedData && (
         <Card title="第3步：查看结果" className="step-card">
-          {/* 调试信息 */}
-          {console.log('渲染第3步, generatedData:', generatedData)}
-          {console.log('testcases数量:', generatedData.testcases?.length)}
-
           {/* 成功提示 */}
           <div className="success-alert">
             <div className="success-title">
-              ✅ 生成完成！共生成 {generatedData.total_unique} 条测试用例
+              ✅ 生成完成！处理流程如下
             </div>
             <div className="success-details">
-              <div>• 请求ID: {generatedData.request_id}</div>
-              <div>• 生成时间: {new Date(generatedData.timestamp).toLocaleString('zh-CN')}</div>
-              <div>• AI模型: {generatedData.metadata?.llm_model?.model_name || 'Unknown'}</div>
+              <div>• 初始生成: {generatedData.total_generated} 条测试用例</div>
               {generatedData.total_duplicates > 0 && (
-                <div>• 去重: {generatedData.total_duplicates} 条</div>
+                <div>• 去重后: {generatedData.total_unique} 条（去除 {generatedData.total_duplicates} 条重复）</div>
               )}
+              {generatedData.optimized && generatedData.total_filtered !== undefined && generatedData.total_filtered > 0 && (
+                <div>• 优先级过滤后: {generatedData.total_after_optimization} 条（过滤 {generatedData.total_filtered} 条低优先级用例）</div>
+              )}
+              <div>• 最终展示: {generatedData.testcases?.length} 条</div>
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #d9d9d9' }}>
+                <div>• 请求ID: {generatedData.request_id}</div>
+                <div>• 生成时间: {new Date(generatedData.timestamp).toLocaleString('zh-CN')}</div>
+                <div>• AI模型: {generatedData.metadata?.llm_model?.model_name || 'Unknown'}</div>
+              </div>
             </div>
           </div>
 
@@ -664,13 +709,13 @@ const SmartGenerate: React.FC = () => {
               </Checkbox>
             </div>
             <Space>
-              <Button 
+              <Button
                 disabled={selectedCases.size === 0}
                 onClick={handleExportExcel}
               >
                 📥 导出Excel
               </Button>
-              <Button 
+              <Button
                 disabled={selectedCases.size === 0}
                 onClick={handleExportJSON}
               >
@@ -685,14 +730,6 @@ const SmartGenerate: React.FC = () => {
                 💾 保存到库 ({selectedCases.size})
               </Button>
             </Space>
-          </div>
-
-          {/* 数据调试显示 */}
-          <div style={{ marginBottom: 16, padding: 16, background: '#f0f0f0', borderRadius: 4 }}>
-            <div>调试信息:</div>
-            <div>总用例数: {generatedData.testcases?.length || 0}</div>
-            <div>数据存在: {generatedData.testcases ? '是' : '否'}</div>
-            <div>是否数组: {Array.isArray(generatedData.testcases) ? '是' : '否'}</div>
           </div>
 
           {/* 用例列表 */}
@@ -745,8 +782,7 @@ const SmartGenerate: React.FC = () => {
                             <ol>
                               {testcase.steps.map((step, idx) => (
                                 <li key={idx}>
-                                  <div><strong>操作：</strong>{step.action}</div>
-                                  <div><strong>预期：</strong>{step.expected}</div>
+                                  执行：{step.action}。预期结果：{step.expected}。
                                 </li>
                               ))}
                             </ol>

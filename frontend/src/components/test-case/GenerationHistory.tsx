@@ -19,7 +19,7 @@ import {
 } from '@ant-design/icons'
 import axios from 'axios'
 import type { ColumnsType } from 'antd/es/table'
-import { getPriorityColor } from '../../utils/priorityUtils'
+import { getPriorityColor, convertPriorityToLabel } from '../../utils/priorityUtils'
 import './GenerationHistory.css'
 
 const { Search } = Input
@@ -157,9 +157,13 @@ const GenerationHistory: React.FC = () => {
       dataIndex: 'priority',
       key: 'priority',
       width: 100,
-      render: (priority: string) => (
-        <Tag color={getPriorityColor(priority)}>{priority}</Tag>
-      ),
+      render: (priority: string | number) => {
+        // 统一转换：支持数字（0-10）和字符串（P0-P3）两种格式
+        const label = typeof priority === 'number' 
+          ? convertPriorityToLabel(priority) 
+          : priority
+        return <Tag color={getPriorityColor(priority)}>{label}</Tag>
+      },
     },
     {
       title: '标签',
@@ -180,7 +184,22 @@ const GenerationHistory: React.FC = () => {
       dataIndex: 'generated_at',
       key: 'generated_at',
       width: 180,
-      render: (date: string) => date ? new Date(date).toLocaleString('zh-CN') : '-',
+      render: (date: string) => {
+        if (!date) return '-'
+        try {
+          return new Date(date).toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          })
+        } catch (e) {
+          return date
+        }
+      },
     },
     {
       title: '操作',
@@ -275,12 +294,28 @@ const GenerationHistory: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="优先级">
                 <Tag color={getPriorityColor(selectedRecord.priority)}>
-                  {selectedRecord.priority}
+                  {typeof selectedRecord.priority === 'number' 
+                    ? convertPriorityToLabel(selectedRecord.priority) 
+                    : selectedRecord.priority}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="生成时间">
                 {selectedRecord.generated_at
-                  ? new Date(selectedRecord.generated_at).toLocaleString('zh-CN')
+                  ? (() => {
+                      try {
+                        return new Date(selectedRecord.generated_at).toLocaleString('zh-CN', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: false
+                        })
+                      } catch (e) {
+                        return selectedRecord.generated_at
+                      }
+                    })()
                   : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="标签" span={2}>
@@ -311,8 +346,7 @@ const GenerationHistory: React.FC = () => {
                 <ol style={{ paddingLeft: 20 }}>
                   {selectedRecord.steps.map((step, idx) => (
                     <li key={idx} style={{ marginBottom: 8 }}>
-                      <div><strong>操作：</strong>{step.action}</div>
-                      <div><strong>预期：</strong>{step.expected}</div>
+                      执行：{step.action}。预期结果：{step.expected}。
                     </li>
                   ))}
                 </ol>

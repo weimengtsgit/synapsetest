@@ -418,11 +418,25 @@ const TestCaseList = () => {
             <div style={{ marginTop: 24 }}>
               <h4>测试步骤:</h4>
               <ol style={{ paddingLeft: 20 }}>
-                {selectedTestCase.steps?.map((step, idx) => (
-                  <li key={idx} style={{ marginBottom: 8 }}>
-                    {step}
-                  </li>
-                ))}
+                {selectedTestCase.steps?.map((step, idx) => {
+                  // 尝试解析JSON格式的步骤
+                  let formattedStep = step
+                  try {
+                    const stepObj = typeof step === 'string' ? JSON.parse(step) : step
+                    if (stepObj.action && stepObj.expected) {
+                      formattedStep = `执行：${stepObj.action}。预期结果：${stepObj.expected}。`
+                    }
+                  } catch (e) {
+                    // 如果不是JSON格式，保持原样
+                    formattedStep = step
+                  }
+                  
+                  return (
+                    <li key={idx} style={{ marginBottom: 8 }}>
+                      {formattedStep}
+                    </li>
+                  )
+                })}
               </ol>
             </div>
 
