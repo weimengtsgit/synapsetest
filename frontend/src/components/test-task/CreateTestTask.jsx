@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Form, Input, Select, Button, Card, message, Alert, Spin, InputNumber } from 'antd'
 import testTaskService from '../../services/testTaskService'
 
@@ -16,23 +16,40 @@ const CreateTestTask = () => {
   const [loading, setLoading] = useState(false)
   const [environments, setEnvironments] = useState([])
   const [versions, setVersions] = useState([])
+  const [modules, setModules] = useState([])
   const [recommendation, setRecommendation] = useState(null)
+  const hasFetchedData = useRef(false)
 
   useEffect(() => {
-    loadInitialData()
+    // Prevent duplicate API calls in React StrictMode
+    if (!hasFetchedData.current) {
+      hasFetchedData.current = true
+      loadInitialData()
+    }
   }, [])
 
   const loadInitialData = async () => {
     try {
-      const [envResponse, versionResponse] = await Promise.all([
+      const [envResponse, versionResponse, modulesResponse] = await Promise.all([
         testTaskService.getEnvironments(),
         testTaskService.getVersions(),
+        testTaskService.getModules(),
       ])
 
       setEnvironments(envResponse || [])
       setVersions(versionResponse || [])
+      
+      // Handle modules response - it returns {success: true, data: [...]}
+      if (modulesResponse && modulesResponse.success && modulesResponse.data) {
+        setModules(modulesResponse.data)
+      } else if (Array.isArray(modulesResponse)) {
+        setModules(modulesResponse)
+      } else {
+        setModules([])
+      }
     } catch (error) {
       message.error('Failed to load initial data')
+      console.error('Error loading initial data:', error)
     }
   }
 
@@ -110,9 +127,6 @@ const CreateTestTask = () => {
             rules={[{ required: true, message: 'Please select environment!' }]}
           >
             <Select placeholder="Select test environment">
-              <Option value="DEV">开发环境 (DEV)</Option>
-              <Option value="STAGING">预发环境 (STAGING)</Option>
-              <Option value="PROD">生产环境 (PROD)</Option>
               {environments.map((env) => (
                 <Option key={env.id} value={env.name}>
                   {env.name}
@@ -141,12 +155,11 @@ const CreateTestTask = () => {
             rules={[{ required: true, message: 'Please select at least one module!' }]}
           >
             <Select mode="multiple" placeholder="Select modules to test">
-              <Option value="user-management">用户管理 (User Management)</Option>
-              <Option value="product-catalog">产品目录 (Product Catalog)</Option>
-              <Option value="order-processing">订单处理 (Order Processing)</Option>
-              <Option value="payment-gateway">支付网关 (Payment Gateway)</Option>
-              <Option value="inventory-management">库存管理 (Inventory Management)</Option>
-              <Option value="reporting">报表系统 (Reporting)</Option>
+              {modules.map((module) => (
+                <Option key={module} value={module}>
+                  {module}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
 

@@ -30,14 +30,28 @@ const TestTaskList = () => {
         response = await testTaskService.getTestTasksByStatus(selectedStatus)
       }
 
-      if (response.success) {
-        // Handle both paginated and list responses
+      // Handle different response formats
+      // If response is an array directly (from backend)
+      if (Array.isArray(response)) {
+        setTasks(response)
+      } 
+      // If response is wrapped in success object
+      else if (response && response.success) {
         const tasksData = response.data.content || response.data
         setTasks(Array.isArray(tasksData) ? tasksData : [])
-      } else {
-        message.error('Failed to load test tasks')
+      }
+      // If response has data property but no success flag
+      else if (response && response.data) {
+        const tasksData = Array.isArray(response.data) ? response.data : response.data.content || []
+        setTasks(tasksData)
+      }
+      // Fallback to empty array
+      else {
+        setTasks([])
+        message.warning('No tasks found')
       }
     } catch (error) {
+      console.error('Error loading test tasks:', error)
       message.error(error.message || 'Failed to load test tasks')
     } finally {
       setLoading(false)
@@ -47,11 +61,16 @@ const TestTaskList = () => {
   const handleStartTask = async (taskId) => {
     try {
       const response = await testTaskService.startTestTask(taskId)
-      if (response.success) {
-        message.success('Test task started successfully')
+      // Backend returns TestTaskResponse directly (via axios interceptor)
+      // Check if we got a valid response with updated status
+      if (response && response.id) {
+        message.success('测试任务启动成功 (Test task started successfully)')
         loadTestTasks() // Reload tasks
+      } else {
+        message.error('Failed to start test task')
       }
     } catch (error) {
+      console.error('Error starting test task:', error)
       message.error(error.message || 'Failed to start test task')
     }
   }
@@ -59,11 +78,16 @@ const TestTaskList = () => {
   const handleCancelTask = async (taskId) => {
     try {
       const response = await testTaskService.cancelTestTask(taskId)
-      if (response.success) {
-        message.success('Test task cancelled successfully')
+      // Backend returns TestTaskResponse directly (via axios interceptor)
+      // Check if we got a valid response with updated status
+      if (response && response.id) {
+        message.success('测试任务已取消 (Test task cancelled successfully)')
         loadTestTasks() // Reload tasks
+      } else {
+        message.error('Failed to cancel test task')
       }
     } catch (error) {
+      console.error('Error cancelling test task:', error)
       message.error(error.message || 'Failed to cancel test task')
     }
   }

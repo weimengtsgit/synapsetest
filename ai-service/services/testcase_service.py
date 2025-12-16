@@ -66,13 +66,21 @@ class TestCaseGenerationService:
 
             # Apply optimization if requested
             if optimization_config:
-                testcases = generation_result.get('testcases', [])
+                testcases_before_optimization = generation_result.get('testcases', [])
+                num_before_optimization = len(testcases_before_optimization)
+
                 optimized = self.generator.optimize_generated_cases(
-                    testcases,
+                    testcases_before_optimization,
                     optimization_config
                 )
+
+                num_after_optimization = len(optimized)
+                num_filtered = num_before_optimization - num_after_optimization
+
                 generation_result['testcases'] = optimized
                 generation_result['optimized'] = True
+                generation_result['total_after_optimization'] = num_after_optimization
+                generation_result['total_filtered'] = num_filtered
 
             # Add request info
             generation_result['request_id'] = request_id
@@ -295,7 +303,7 @@ class TestCaseGenerationService:
                         'preconditions': testcase.get('preconditions', []),
                         'tags': testcase.get('tags', []),
                         'request_id': request_id,  # Link back to generation request
-                        'generated_at': datetime.utcnow().isoformat()
+                        'generated_at': datetime.utcnow().isoformat() + 'Z'  # Add Z suffix for UTC timezone
                     }
 
                     # Add to vector database
@@ -425,6 +433,12 @@ class TestCaseGenerationService:
             # Format results for response
             history_records = []
             for record in records:
+                # Normalize generated_at to ensure it has timezone info
+                generated_at = record.get('generated_at', '')
+                if generated_at and not generated_at.endswith('Z') and not generated_at.endswith('+00:00'):
+                    # Add Z suffix for UTC timezone if missing
+                    generated_at = generated_at + 'Z'
+                
                 history_records.append({
                     'id': record.get('testcase_id', record.get('id')),
                     'request_id': record.get('request_id', ''),
@@ -433,7 +447,7 @@ class TestCaseGenerationService:
                     'type': record.get('type', ''),
                     'priority': record.get('priority', ''),
                     'tags': record.get('tags', []),
-                    'generated_at': record.get('generated_at', ''),
+                    'generated_at': generated_at,
                     'description': record.get('description', ''),
                     'steps': record.get('steps', []),
                     'preconditions': record.get('preconditions', []),

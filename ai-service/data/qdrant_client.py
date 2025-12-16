@@ -80,30 +80,50 @@ class QdrantClient(VectorDBInterface):
                     self._client = QdrantSDK(path=str(storage_path))
                     logger.info(f"Qdrant storage path: {storage_path}")
                 else:
-                    logger.info(f"Connecting to Qdrant: {ai_config.QDRANT_HOST}:{ai_config.QDRANT_PORT}")
-                    # Add timeout and retry logic for server mode
-                    import time
-                    max_retries = 3
-                    retry_delay = 2  # seconds
+                    # Connect to Qdrant server using HTTP REST API (port 6333)
+                    logger.info(f"Connecting to Qdrant HTTP REST API: {ai_config.QDRANT_HOST}:{ai_config.QDRANT_PORT}")
                     
-                    for attempt in range(max_retries):
-                        try:
-                            # Use URL format to avoid version compatibility issues
-                            # qdrant-client 1.16.1 works better with URL format
-                            self._client = QdrantSDK(
-                                url=f"http://{ai_config.QDRANT_HOST}:{ai_config.QDRANT_PORT}",
-                                prefer_grpc=False,  # Use REST API by default
-                                timeout=10,  # 10 second timeout
-                            )
-                            # Test connection by getting collections
-                            self._client.get_collections()
-                            break  # Success, exit retry loop
-                        except Exception as e:
-                            if attempt < max_retries - 1:
-                                logger.warning(f"Qdrant connection attempt {attempt + 1}/{max_retries} failed: {e}. Retrying in {retry_delay}s...")
-                                time.sleep(retry_delay)
-                            else:
-                                raise  # Re-raise on last attempt
+                    # Disable proxy for direct connection to avoid 502 errors
+                    # Many environments have HTTP_PROXY set which causes issues with internal IPs
+                    import os
+                    old_http_proxy = os.environ.get('HTTP_PROXY')
+                    old_https_proxy = os.environ.get('HTTPS_PROXY')
+                    old_no_proxy = os.environ.get('NO_PROXY')
+                    
+                    try:
+                        # Temporarily disable proxy
+                        if old_http_proxy:
+                            os.environ.pop('HTTP_PROXY', None)
+                        if old_https_proxy:
+                            os.environ.pop('HTTPS_PROXY', None)
+                        # Ensure internal IPs bypass proxy
+                        os.environ['NO_PROXY'] = '127.0.0.1,localhost,10.*,172.*,192.168.*'
+                        
+                        logger.info("Proxy disabled for direct connection")
+                        
+                        # Simple connection using host and port (most compatible)
+                        # This uses HTTP REST API by default (no gRPC)
+                        self._client = QdrantSDK(
+                            host=ai_config.QDRANT_HOST,
+                            port=ai_config.QDRANT_PORT,
+                            timeout=10
+                        )
+                        
+                        # Test connection
+                        logger.info("Testing Qdrant connection...")
+                        collections = self._client.get_collections()
+                        logger.info(f"Successfully connected to Qdrant (collections: {len(collections.collections)})")
+                        
+                    finally:
+                        # Restore proxy settings
+                        if old_http_proxy:
+                            os.environ['HTTP_PROXY'] = old_http_proxy
+                        if old_https_proxy:
+                            os.environ['HTTPS_PROXY'] = old_https_proxy
+                        if old_no_proxy:
+                            os.environ['NO_PROXY'] = old_no_proxy
+                        elif 'NO_PROXY' in os.environ:
+                            os.environ.pop('NO_PROXY', None)
                 
                 # Initialize collection
                 self._init_collection()
@@ -574,21 +594,22 @@ class QdrantClient(VectorDBInterface):
                     ]
                 )
 
-            # Use scroll API to get all records
-            # Qdrant scroll returns records in batches
+            # Get all matching records to determine total count
+            # This is necessary because Qdrant doesn't provide a separate count API
+            # and get_collection() may have compatibility issues with some Qdrant versions
             all_points = []
             scroll_result = self._client.scroll(
                 collection_name=self.COLLECTION_NAME,
                 scroll_filter=scroll_filter,
-                limit=limit + offset,  # Get enough to handle offset
+                limit=10000,  # Large enough to get all records in most cases
                 with_payload=True,
                 with_vectors=False  # Don't need vectors for history display
             )
 
             all_points = scroll_result[0]  # First element is the list of points
-
-            # Apply offset and limit
             total_count = len(all_points)
+
+            # Apply offset and limit for pagination
             paginated_points = all_points[offset:offset + limit]
 
             # Format results with all available fields
@@ -610,14 +631,14 @@ class QdrantClient(VectorDBInterface):
                     'generated_at': payload.get('generated_at', '')
                 })
 
-            logger.info(f"Scrolled {len(records)} test cases from Qdrant (total: {total_count})")
+            logger.info(f"Scrolled {len(records)} test cases from Qdrant (total: {total_count}, offset: {offset}, limit: {limit})")
             return {
                 'total': total_count,
                 'records': records
             }
 
         except Exception as e:
-            logger.error(f"Failed to scroll test cases: {e}")
+            logger.error(f"Failed to scroll test cases: {e}", exc_info=True)
             return {'total': 0, 'records': []}
 
     def close(self):

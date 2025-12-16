@@ -95,6 +95,13 @@ const testTaskService = {
   getVersions: async () => {
     return apiClient.get('/test-versions')
   },
+
+  /**
+   * Get all distinct modules from test cases
+   */
+  getModules: async () => {
+    return apiClient.get('/test-cases/modules')
+  },
 }
 
 export default testTaskService

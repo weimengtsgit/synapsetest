@@ -211,11 +211,21 @@ public class TestCaseService {
             testCase.setId(id);
             testCase.setCaseNumber(caseNumber);
 
-            // Support both "title" and "case_name"
+            // Support "title", "name", and "case_name" (priority: title > name > case_name)
+            // AI generates "name" field, so we need to check it
             String title = (String) tcMap.get("title");
+            if (title == null) {
+                title = (String) tcMap.get("name");  // AI生成的字段
+            }
             if (title == null) {
                 title = (String) tcMap.get("case_name");
             }
+            
+            // Validate title: warn if it contains English letters (AI should generate Chinese only)
+            if (title != null && title.matches(".*[a-zA-Z]+.*")) {
+                log.warn("⚠️  Test case title contains English letters (should be Chinese only): {}", title);
+            }
+            
             testCase.setTitle(title);
 
             testCase.setDescription((String) tcMap.getOrDefault("description", ""));

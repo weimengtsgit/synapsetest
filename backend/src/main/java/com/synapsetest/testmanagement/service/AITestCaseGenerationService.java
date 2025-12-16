@@ -222,30 +222,30 @@ public class AITestCaseGenerationService {
 
         List<String> scenarios = new ArrayList<>();
 
-        // Extract main scenarios based on keywords
+        // Extract main scenarios based on keywords (使用中文以保持一致性)
         if (input.toLowerCase().contains("login") || input.toLowerCase().contains("登录")) {
-            scenarios.add("User login with valid credentials");
-            scenarios.add("User login with invalid credentials");
-            scenarios.add("User login with empty fields");
+            scenarios.add("验证用户使用有效凭证登录");
+            scenarios.add("验证用户使用无效凭证登录");
+            scenarios.add("验证用户使用空字段登录");
         }
 
         if (input.toLowerCase().contains("register") || input.toLowerCase().contains("注册")) {
-            scenarios.add("User registration with valid data");
-            scenarios.add("User registration with duplicate email");
-            scenarios.add("User registration with invalid email format");
+            scenarios.add("验证用户使用有效数据注册");
+            scenarios.add("验证用户使用重复邮箱注册");
+            scenarios.add("验证用户使用无效邮箱格式注册");
         }
 
         if (input.toLowerCase().contains("search") || input.toLowerCase().contains("搜索")) {
-            scenarios.add("Search with valid query");
-            scenarios.add("Search with empty query");
-            scenarios.add("Search with special characters");
+            scenarios.add("验证使用有效查询搜索");
+            scenarios.add("验证使用空查询搜索");
+            scenarios.add("验证使用特殊字符搜索");
         }
 
-        // Default scenarios if no keywords matched
+        // Default scenarios if no keywords matched (使用中文)
         if (scenarios.isEmpty()) {
-            scenarios.add("Happy path scenario");
-            scenarios.add("Error handling scenario");
-            scenarios.add("Edge case scenario");
+            scenarios.add("验证正常流程场景");
+            scenarios.add("验证错误处理场景");
+            scenarios.add("验证边界条件场景");
         }
 
         return scenarios;
@@ -257,11 +257,11 @@ public class AITestCaseGenerationService {
     private TestCaseResponse generateTestCaseForScenario(String scenario, AITestCaseGenerationRequest request, int index) {
         TestCaseResponse testCase = new TestCaseResponse();
 
-        // Generate title
-        testCase.setTitle(String.format("TC%03d: %s", index, scenario));
+        // Generate title (使用中文)
+        testCase.setTitle(String.format("测试用例%03d：%s", index, scenario));
 
-        // Generate description
-        testCase.setDescription(String.format("This test case verifies: %s", scenario));
+        // Generate description (使用中文)
+        testCase.setDescription(String.format("此测试用例验证：%s", scenario));
 
         // Generate test steps
         testCase.setSteps(generateTestSteps(scenario));
@@ -292,50 +292,50 @@ public class AITestCaseGenerationService {
     }
 
     /**
-     * Generate test steps for a scenario
+     * Generate test steps for a scenario (使用中文)
      */
     private List<String> generateTestSteps(String scenario) {
         List<String> steps = new ArrayList<>();
 
-        if (scenario.toLowerCase().contains("login")) {
-            steps.add("Navigate to login page");
-            steps.add("Enter username in username field");
-            steps.add("Enter password in password field");
-            steps.add("Click login button");
-            steps.add("Verify login result");
-        } else if (scenario.toLowerCase().contains("register")) {
-            steps.add("Navigate to registration page");
-            steps.add("Fill in all required fields");
-            steps.add("Accept terms and conditions");
-            steps.add("Click register button");
-            steps.add("Verify registration confirmation");
-        } else if (scenario.toLowerCase().contains("search")) {
-            steps.add("Navigate to search page");
-            steps.add("Enter search query in search box");
-            steps.add("Click search button");
-            steps.add("Verify search results");
+        if (scenario.toLowerCase().contains("登录")) {
+            steps.add("导航到登录页面");
+            steps.add("在用户名字段输入用户名");
+            steps.add("在密码字段输入密码");
+            steps.add("点击登录按钮");
+            steps.add("验证登录结果");
+        } else if (scenario.toLowerCase().contains("注册")) {
+            steps.add("导航到注册页面");
+            steps.add("填写所有必填字段");
+            steps.add("接受条款和条件");
+            steps.add("点击注册按钮");
+            steps.add("验证注册确认信息");
+        } else if (scenario.toLowerCase().contains("搜索")) {
+            steps.add("导航到搜索页面");
+            steps.add("在搜索框输入搜索查询");
+            steps.add("点击搜索按钮");
+            steps.add("验证搜索结果");
         } else {
-            steps.add("Precondition: System is ready");
-            steps.add("Execute main action");
-            steps.add("Verify expected outcome");
-            steps.add("Cleanup and reset");
+            steps.add("前置条件：系统已就绪");
+            steps.add("执行主要操作");
+            steps.add("验证预期结果");
+            steps.add("清理并重置");
         }
 
         return steps;
     }
 
     /**
-     * Generate expected results for a scenario
+     * Generate expected results for a scenario (使用中文)
      */
     private String generateExpectedResults(String scenario) {
-        if (scenario.toLowerCase().contains("valid") || scenario.toLowerCase().contains("success")) {
-            return "Operation should complete successfully. User should see success message and be redirected appropriately.";
-        } else if (scenario.toLowerCase().contains("invalid") || scenario.toLowerCase().contains("error")) {
-            return "Operation should fail gracefully. User should see appropriate error message. System should remain in stable state.";
-        } else if (scenario.toLowerCase().contains("empty")) {
-            return "System should display validation error. User should be prompted to provide required information.";
+        if (scenario.toLowerCase().contains("有效") || scenario.toLowerCase().contains("正常")) {
+            return "操作应成功完成。用户应看到成功消息并被适当重定向。";
+        } else if (scenario.toLowerCase().contains("无效") || scenario.toLowerCase().contains("错误")) {
+            return "操作应优雅地失败。用户应看到适当的错误消息。系统应保持稳定状态。";
+        } else if (scenario.toLowerCase().contains("空")) {
+            return "系统应显示验证错误。应提示用户提供所需信息。";
         } else {
-            return "System should behave according to specification. All expected outcomes should be achieved.";
+            return "系统应按照规范行为。所有预期结果应达成。";
         }
     }
 
