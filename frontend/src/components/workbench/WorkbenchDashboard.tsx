@@ -141,7 +141,7 @@ const WorkbenchDashboard: React.FC = () => {
       title: '生成测试用例',
       icon: <FileTextOutlined style={{ fontSize: 32, color: '#1890ff' }} />,
       description: 'AI智能生成测试用例',
-      path: '/test-cases/generate',
+      path: '/test-cases/smart-generate',
       color: '#e6f7ff',
     },
     {
@@ -162,7 +162,7 @@ const WorkbenchDashboard: React.FC = () => {
       title: '效能分析',
       icon: <BarChartOutlined style={{ fontSize: 32, color: '#722ed1' }} />,
       description: '查看团队测试效能',
-      path: '/analytics/efficiency',
+      path: '/monitoring/dashboard',
       color: '#f9f0ff',
     },
   ];

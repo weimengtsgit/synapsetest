@@ -102,6 +102,20 @@ const testTaskService = {
   getModules: async () => {
     return apiClient.get('/test-cases/modules')
   },
+  
+  /**
+   * Preview matched test cases without creating a task
+   */
+  previewTestCases: async (taskData) => {
+    return apiClient.post('/test-tasks/preview-test-cases', taskData)
+  },
+  
+  /**
+   * Get test cases associated with a task
+   */
+  getTestCasesByTaskId: async (taskId) => {
+    return apiClient.get(`/test-tasks/${taskId}/test-cases`)
+  },
 }
 
 export default testTaskService

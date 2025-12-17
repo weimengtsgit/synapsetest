@@ -131,6 +131,40 @@
         ORDER BY case_number DESC 
         LIMIT 1
     </select>
+    
+    <!-- Select by Module -->
+    <select id="selectByModule" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases 
+        WHERE module = #{module} 
+        AND status = 'APPROVED'
+        ORDER BY priority DESC, created_at DESC
+    </select>
+    
+    <!-- Select by Module and Status -->
+    <select id="selectByModuleAndStatus" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases 
+        WHERE module = #{module} 
+        AND status = #{status}
+        ORDER BY priority DESC, created_at DESC
+    </select>
+    
+    <!-- Select by Module and Priority -->
+    <select id="selectByModuleAndPriority" resultMap="TestCaseResultMap">
+        SELECT * FROM test_cases 
+        WHERE module = #{module} 
+        AND priority >= #{minPriority}
+        AND status = 'APPROVED'
+        ORDER BY priority DESC, created_at DESC
+    </select>
+    
+    <!-- Select Distinct Modules -->
+    <select id="selectDistinctModules" resultType="string">
+        SELECT DISTINCT module 
+        FROM test_cases 
+        WHERE module IS NOT NULL 
+        AND module != ''
+        ORDER BY module
+    </select>
 
 </mapper>
 

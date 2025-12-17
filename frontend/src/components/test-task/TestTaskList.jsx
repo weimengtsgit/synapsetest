@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Table, Tag, Button, Space, message, Card, Select } from 'antd'
 import { PlayCircleOutlined, StopOutlined, EyeOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import testTaskService from '../../services/testTaskService'
 
 const { Option } = Select
@@ -12,6 +13,7 @@ const { Option } = Select
  * Task: T041 [P] [US1] Create frontend components for 测试任务列表页面
  */
 const TestTaskList = () => {
+  const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState('ALL')
@@ -30,25 +32,14 @@ const TestTaskList = () => {
         response = await testTaskService.getTestTasksByStatus(selectedStatus)
       }
 
-      // Handle different response formats
-      // If response is an array directly (from backend)
-      if (Array.isArray(response)) {
-        setTasks(response)
-      } 
-      // If response is wrapped in success object
-      else if (response && response.success) {
+      // Backend now returns unified ApiResponse format
+      if (response && response.success) {
+        // Handle both array and paginated responses
         const tasksData = response.data.content || response.data
         setTasks(Array.isArray(tasksData) ? tasksData : [])
-      }
-      // If response has data property but no success flag
-      else if (response && response.data) {
-        const tasksData = Array.isArray(response.data) ? response.data : response.data.content || []
-        setTasks(tasksData)
-      }
-      // Fallback to empty array
-      else {
+      } else {
         setTasks([])
-        message.warning('No tasks found')
+        message.warning(response?.message || 'No tasks found')
       }
     } catch (error) {
       console.error('Error loading test tasks:', error)
@@ -61,13 +52,12 @@ const TestTaskList = () => {
   const handleStartTask = async (taskId) => {
     try {
       const response = await testTaskService.startTestTask(taskId)
-      // Backend returns TestTaskResponse directly (via axios interceptor)
-      // Check if we got a valid response with updated status
-      if (response && response.id) {
-        message.success('测试任务启动成功 (Test task started successfully)')
+      // Backend returns ApiResponse<TestTaskResponse>
+      if (response && response.success && response.data) {
+        message.success(response.message || '测试任务启动成功 (Test task started successfully)')
         loadTestTasks() // Reload tasks
       } else {
-        message.error('Failed to start test task')
+        message.error(response?.message || 'Failed to start test task')
       }
     } catch (error) {
       console.error('Error starting test task:', error)
@@ -78,13 +68,12 @@ const TestTaskList = () => {
   const handleCancelTask = async (taskId) => {
     try {
       const response = await testTaskService.cancelTestTask(taskId)
-      // Backend returns TestTaskResponse directly (via axios interceptor)
-      // Check if we got a valid response with updated status
-      if (response && response.id) {
-        message.success('测试任务已取消 (Test task cancelled successfully)')
+      // Backend returns ApiResponse<TestTaskResponse>
+      if (response && response.success && response.data) {
+        message.success(response.message || '测试任务已取消 (Test task cancelled successfully)')
         loadTestTasks() // Reload tasks
       } else {
-        message.error('Failed to cancel test task')
+        message.error(response?.message || 'Failed to cancel test task')
       }
     } catch (error) {
       console.error('Error cancelling test task:', error)
@@ -128,6 +117,16 @@ const TestTaskList = () => {
       width: 120,
     },
     {
+      title: '用例数量 (Test Cases)',
+      dataIndex: 'totalTestCases',
+      key: 'totalTestCases',
+      width: 120,
+      render: (count) => (
+        <Tag color="blue">{count || 0} 个</Tag>
+      ),
+      sorter: (a, b) => (a.totalTestCases || 0) - (b.totalTestCases || 0),
+    },
+    {
       title: '状态 (Status)',
       dataIndex: 'status',
       key: 'status',
@@ -165,7 +164,7 @@ const TestTaskList = () => {
             type="link"
             icon={<EyeOutlined />}
             size="small"
-            onClick={() => message.info(`View task: ${record.id}`)}
+            onClick={() => navigate(`/test-tasks/${record.id}`)}
           >
             查看
           </Button>

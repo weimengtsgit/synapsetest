@@ -1,29 +1,31 @@
 package com.synapsetest.testmanagement.service;
 
-import com.synapsetest.testmanagement.dto.TestTaskRequest;
 import com.synapsetest.testmanagement.dto.request.CreateTestTaskRequest;
 import com.synapsetest.testmanagement.dto.response.PageResponse;
 import com.synapsetest.testmanagement.dto.response.TestTaskResponse;
 import com.synapsetest.testmanagement.exception.ResourceNotFoundException;
 import com.synapsetest.testmanagement.exception.ValidationException;
+import com.synapsetest.testmanagement.mapper.TaskTestCaseMapper;
+import com.synapsetest.testmanagement.mapper.TestCaseMapper;
 import com.synapsetest.testmanagement.mapper.TestTaskMapper;
+import com.synapsetest.testmanagement.model.TaskTestCase;
+import com.synapsetest.testmanagement.model.TestCase;
 import com.synapsetest.testmanagement.model.TestTask;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * TestTask Service (MyBatis version)
+ * TestTask Service (MyBatis version with TestCase association)
  * Business logic for test task management
  *
  * Task: T030 [US1] Implement TestTaskService
+ * Enhanced with task-testcase association management
  */
 @Slf4j
 @Service
@@ -31,11 +33,14 @@ import java.util.stream.Collectors;
 public class TestTaskService {
 
     private final TestTaskMapper testTaskMapper;
+    private final TaskTestCaseMapper taskTestCaseMapper;
+    private final TestCaseMapper testCaseMapper;
     private final TestRecommendationService recommendationService;
 
     /**
-     * Create a new test task with AI recommendations
+     * Create a new test task with AI recommendations and associated test cases
      */
+    @Transactional
     public TestTaskResponse createTestTask(CreateTestTaskRequest request, String username) {
         log.info("Creating test task: {} by user: {}", request.getTaskName(), username);
 
@@ -62,13 +67,128 @@ public class TestTaskService {
 
         log.info("Test task created successfully with ID: {}", testTask.getId());
 
-        // Convert to response DTO
-        return convertToResponse(testTask, recommendation);
+        // Match relevant test cases
+        List<TestCase> matchedTestCases = matchTestCases(request, recommendation);
+        
+        // Create task-testcase associations
+        if (!matchedTestCases.isEmpty()) {
+            List<TaskTestCase> associations = new ArrayList<>();
+            for (int i = 0; i < matchedTestCases.size(); i++) {
+                TaskTestCase association = new TaskTestCase();
+                association.setTaskId(testTask.getId());
+                association.setTestCaseId(matchedTestCases.get(i).getId());
+                association.setExecutionOrder(i + 1);
+                association.setCreatedAt(LocalDateTime.now());
+                associations.add(association);
+            }
+            taskTestCaseMapper.batchInsert(associations);
+            log.info("Associated {} test cases with task {}", matchedTestCases.size(), testTask.getId());
+        } else {
+            log.warn("No test cases matched for task {}", testTask.getId());
+        }
+
+        // Convert to response with test cases
+        return convertToResponseWithTestCases(testTask, recommendation, matchedTestCases);
     }
 
     /**
-     * Get test task by ID
-     * Note: Soft-deleted tasks (CANCELLED status) are treated as not found
+     * Match relevant test cases based on request and recommendation
+     */
+    private List<TestCase> matchTestCases(CreateTestTaskRequest request, 
+                                          TestTaskResponse.TestRecommendation recommendation) {
+        log.info("Matching test cases for modules: {}", request.getModules());
+        
+        List<TestCase> allTestCases = new ArrayList<>();
+        
+        // Strategy 1: Match by modules
+        for (String module : request.getModules()) {
+            List<TestCase> moduleCases = testCaseMapper.selectByModule(module);
+            allTestCases.addAll(moduleCases);
+            log.debug("Found {} test cases for module: {}", moduleCases.size(), module);
+        }
+        
+        if (allTestCases.isEmpty()) {
+            log.warn("No test cases found for modules: {}", request.getModules());
+            return Collections.emptyList();
+        }
+        
+        // Strategy 2: Filter by test scope and priority
+        String scope = recommendation.getRecommendedScope();
+        List<TestCase> filteredCases = filterByTestScope(allTestCases, scope);
+        
+        // Strategy 3: Remove duplicates (keep higher priority)
+        filteredCases = removeDuplicates(filteredCases);
+        
+        // Strategy 4: Sort by priority (descending)
+        filteredCases.sort((a, b) -> b.getPriority().compareTo(a.getPriority()));
+        
+        log.info("Matched {} test cases after filtering (scope: {})", filteredCases.size(), scope);
+        return filteredCases;
+    }
+    
+    /**
+     * Filter test cases by test scope
+     */
+    private List<TestCase> filterByTestScope(List<TestCase> testCases, String scope) {
+        switch (scope) {
+            case "SMOKE":
+                // Smoke testing: Only P0 high priority cases (priority >= 8)
+                return testCases.stream()
+                    .filter(tc -> tc.getPriority() >= 8)
+                    .limit(20)  // Limit to 20 cases for smoke test
+                    .collect(Collectors.toList());
+                
+            case "CORE":
+                // Core regression: P0-P1 cases (priority >= 5)
+                return testCases.stream()
+                    .filter(tc -> tc.getPriority() >= 5)
+                    .limit(50)  // Limit to 50 cases
+                    .collect(Collectors.toList());
+                
+            case "FULL":
+                // Full regression: All cases
+                return testCases;
+                
+            default:
+                log.warn("Unknown test scope: {}, using CORE as default", scope);
+                return testCases.stream()
+                    .filter(tc -> tc.getPriority() >= 5)
+                    .limit(50)
+                    .collect(Collectors.toList());
+        }
+    }
+    
+    /**
+     * Remove duplicate test cases (keep the one with higher priority)
+     */
+    private List<TestCase> removeDuplicates(List<TestCase> testCases) {
+        Map<String, TestCase> uniqueCases = new LinkedHashMap<>();
+        for (TestCase testCase : testCases) {
+            String key = testCase.getId();
+            TestCase existing = uniqueCases.get(key);
+            if (existing == null || testCase.getPriority() > existing.getPriority()) {
+                uniqueCases.put(key, testCase);
+            }
+        }
+        return new ArrayList<>(uniqueCases.values());
+    }
+
+    /**
+     * Preview matched test cases without creating a task
+     */
+    public List<TestCase> previewMatchedTestCases(CreateTestTaskRequest request) {
+        log.info("Previewing test cases for modules: {}", request.getModules());
+        
+        // Get AI recommendations
+        TestTaskResponse.TestRecommendation recommendation =
+                recommendationService.getTestRecommendation(request);
+        
+        // Match test cases
+        return matchTestCases(request, recommendation);
+    }
+
+    /**
+     * Get test task by ID with associated test cases
      */
     public TestTaskResponse getTestTaskById(String id) {
         TestTask testTask = testTaskMapper.selectById(id);
@@ -81,7 +201,17 @@ public class TestTaskService {
             throw new ResourceNotFoundException("TestTask", "id", id);
         }
 
-        return convertToResponse(testTask, null);
+        // Get associated test cases
+        List<TestCase> testCases = taskTestCaseMapper.selectTestCasesByTaskId(id);
+        
+        return convertToResponseWithTestCases(testTask, null, testCases);
+    }
+    
+    /**
+     * Get test cases associated with a task
+     */
+    public List<TestCase> getTestCasesByTaskId(String taskId) {
+        return taskTestCaseMapper.selectTestCasesByTaskId(taskId);
     }
 
     /**
@@ -91,13 +221,13 @@ public class TestTaskService {
         return testTaskMapper.selectAll()
                 .stream()
                 .filter(task -> !TestTask.Status.CANCELLED.name().equals(task.getStatus()))
-                .map(task -> convertToResponse(task, null))
+                .map(task -> convertToResponseWithTestCases(task, null, 
+                    taskTestCaseMapper.selectTestCasesByTaskId(task.getId())))
                 .collect(Collectors.toList());
     }
 
     /**
      * Get test tasks by status
-     * Note: When querying non-CANCELLED status, soft-deleted tasks are excluded
      */
     public List<TestTaskResponse> getTestTasksByStatus(String status) {
         List<TestTask> tasks = testTaskMapper.selectByStatus(status);
@@ -106,20 +236,21 @@ public class TestTaskService {
         // Otherwise, exclude soft-deleted tasks
         if (TestTask.Status.CANCELLED.name().equals(status)) {
             return tasks.stream()
-                    .map(task -> convertToResponse(task, null))
+                    .map(task -> convertToResponseWithTestCases(task, null,
+                        taskTestCaseMapper.selectTestCasesByTaskId(task.getId())))
                     .collect(Collectors.toList());
         }
         
         // For other statuses, exclude CANCELLED tasks (soft-deleted)
         return tasks.stream()
                 .filter(task -> !TestTask.Status.CANCELLED.name().equals(task.getStatus()))
-                .map(task -> convertToResponse(task, null))
+                .map(task -> convertToResponseWithTestCases(task, null,
+                    taskTestCaseMapper.selectTestCasesByTaskId(task.getId())))
                 .collect(Collectors.toList());
     }
 
     /**
      * Get test tasks by status with pagination
-     * Note: When querying non-CANCELLED status, soft-deleted tasks are excluded
      */
     public PageResponse<TestTaskResponse> getTestTasksByStatusWithPagination(
             String status, int page, int size) {
@@ -140,7 +271,8 @@ public class TestTaskService {
         List<TestTaskResponse> pagedTasks = allTasks.stream()
                 .skip((long) page * size)
                 .limit(size)
-                .map(task -> convertToResponse(task, null))
+                .map(task -> convertToResponseWithTestCases(task, null,
+                    taskTestCaseMapper.selectTestCasesByTaskId(task.getId())))
                 .collect(Collectors.toList());
         
         return PageResponse.of(pagedTasks, page, size, totalElements);
@@ -165,7 +297,8 @@ public class TestTaskService {
 
         log.info("Test task started: {}", id);
 
-        return convertToResponse(testTask, null);
+        List<TestCase> testCases = taskTestCaseMapper.selectTestCasesByTaskId(id);
+        return convertToResponseWithTestCases(testTask, null, testCases);
     }
 
     /**
@@ -187,7 +320,8 @@ public class TestTaskService {
 
         log.info("Test task cancelled: {}", id);
 
-        return convertToResponse(testTask, null);
+        List<TestCase> testCases = taskTestCaseMapper.selectTestCasesByTaskId(id);
+        return convertToResponseWithTestCases(testTask, null, testCases);
     }
 
     /**
@@ -209,7 +343,8 @@ public class TestTaskService {
 
         log.info("Test task status updated: {} from {} to {}", id, currentStatus, newStatus);
 
-        return convertToResponse(testTask, null);
+        List<TestCase> testCases = taskTestCaseMapper.selectTestCasesByTaskId(id);
+        return convertToResponseWithTestCases(testTask, null, testCases);
     }
 
     /**
@@ -232,6 +367,7 @@ public class TestTaskService {
     /**
      * Delete a test task (soft delete by setting status to CANCELLED)
      */
+    @Transactional
     public void deleteTestTask(String id) {
         TestTask testTask = testTaskMapper.selectById(id);
         if (testTask == null) {
@@ -242,6 +378,8 @@ public class TestTaskService {
         testTask.setStatus(TestTask.Status.CANCELLED.name());
         testTask.setUpdatedAt(LocalDateTime.now());
         testTaskMapper.update(testTask);
+        
+        // Note: We keep the task-testcase associations for audit purposes
 
         log.info("Test task soft deleted (marked as CANCELLED): {}", id);
     }
@@ -253,11 +391,15 @@ public class TestTaskService {
         log.info("Getting AI recommendation for context: {}", request.getTaskName());
         return recommendationService.getTestRecommendation(request);
     }
-
+    
     /**
-     * Convert entity to response DTO
+     * Convert entity to response DTO with test cases
      */
-    private TestTaskResponse convertToResponse(TestTask task, TestTaskResponse.TestRecommendation recommendation) {
+    private TestTaskResponse convertToResponseWithTestCases(
+            TestTask task, 
+            TestTaskResponse.TestRecommendation recommendation,
+            List<TestCase> testCases) {
+        
         TestTaskResponse response = new TestTaskResponse();
         response.setId(task.getId());
         response.setName(task.getName());
@@ -283,7 +425,36 @@ public class TestTaskService {
             aiRecommendation.put("reasoning", recommendation.getReasoning());
             response.setAiRecommendation(aiRecommendation);
         }
+        
+        // Add test cases information
+        if (testCases != null && !testCases.isEmpty()) {
+            List<TestTaskResponse.TestCaseInfo> testCaseInfos = testCases.stream()
+                .map(this::convertToTestCaseInfo)
+                .collect(Collectors.toList());
+            response.setTestCases(testCaseInfos);
+            response.setTotalTestCases(testCaseInfos.size());
+        } else {
+            response.setTestCases(Collections.emptyList());
+            response.setTotalTestCases(0);
+        }
 
         return response;
+    }
+    
+    /**
+     * Convert TestCase to TestCaseInfo
+     */
+    private TestTaskResponse.TestCaseInfo convertToTestCaseInfo(TestCase testCase) {
+        TestTaskResponse.TestCaseInfo info = new TestTaskResponse.TestCaseInfo();
+        info.setId(testCase.getId());
+        info.setCaseNumber(testCase.getCaseNumber());
+        info.setTitle(testCase.getTitle());
+        info.setModule(testCase.getModule());
+        info.setPriority(testCase.getPriority());
+        info.setType(testCase.getType());
+        info.setStatus(testCase.getStatus());
+        // Note: executionOrder is not set here as it's not part of TestCase entity
+        // It should be set when querying from task_test_cases table
+        return info;
     }
 }

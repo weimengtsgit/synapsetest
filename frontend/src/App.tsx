@@ -16,6 +16,7 @@ import './App.css'
 // Import components
 import CreateTestTask from './components/test-task/CreateTestTask'
 import TestTaskList from './components/test-task/TestTaskList'
+import TestTaskDetail from './components/test-task/TestTaskDetail'
 import AITestCaseGeneration from './components/test-case/AITestCaseGeneration'
 import TestCaseList from './components/test-case/TestCaseList'
 import Dashboard from './components/monitoring/Dashboard'
@@ -184,6 +185,7 @@ const App: React.FC = () => {
               {/* Test Tasks */}
               <Route path="/test-tasks/create" element={<CreateTestTask />} />
               <Route path="/test-tasks/list" element={<TestTaskList />} />
+              <Route path="/test-tasks/:id" element={<TestTaskDetail />} />
               <Route path="/test-tasks/execution" element={<ExecutionTracking />} />
 
               {/* Monitoring & Reports */}
