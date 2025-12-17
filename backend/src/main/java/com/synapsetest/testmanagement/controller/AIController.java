@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -46,6 +47,66 @@ public class AIController {
         } catch (JsonProcessingException e) {
             return obj.toString();
         }
+    }
+
+    /**
+     * Convert camelCase field names to snake_case for AI Service (Python)
+     * 
+     * Handles nested maps and converts:
+     * - taskId → task_id
+     * - environmentId → environment_id
+     * - versionId → version_id
+     * - codeChange → code_change
+     * - changedFilesCount → changed_files_count
+     * - changedLinesCount → changed_lines_count
+     * - changedModules → changed_modules
+     * - recentPassRate → recent_pass_rate
+     * - recentDefectCount → recent_defect_count
+     * - moduleImportance → module_importance
+     */
+    private Map<String, Object> convertToSnakeCase(Map<String, Object> camelCaseMap) {
+        Map<String, Object> snakeCaseMap = new HashMap<>();
+        
+        for (Map.Entry<String, Object> entry : camelCaseMap.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            
+            // Convert key to snake_case
+            String snakeCaseKey = toSnakeCase(key);
+            
+            // Recursively convert nested maps
+            if (value instanceof Map) {
+                snakeCaseMap.put(snakeCaseKey, convertToSnakeCase((Map<String, Object>) value));
+            } else {
+                snakeCaseMap.put(snakeCaseKey, value);
+            }
+        }
+        
+        return snakeCaseMap;
+    }
+    
+    /**
+     * Convert camelCase string to snake_case
+     */
+    private String toSnakeCase(String camelCase) {
+        if (camelCase == null || camelCase.isEmpty()) {
+            return camelCase;
+        }
+        
+        StringBuilder result = new StringBuilder();
+        result.append(Character.toLowerCase(camelCase.charAt(0)));
+        
+        for (int i = 1; i < camelCase.length(); i++) {
+            char ch = camelCase.charAt(i);
+            if (Character.isUpperCase(ch)) {
+                result.append('_');
+                result.append(Character.toLowerCase(ch));
+            } else {
+                result.append(ch);
+            }
+        }
+        
+        return result.toString();
     }
     /**
      * AI generate test cases from requirement
@@ -216,7 +277,7 @@ public class AIController {
      *
      * POST /api/v1/ai/recommendation/strategy
      *
-     * Note: This endpoint will be enhanced to support environment_id and version_id
+     * Converts camelCase field names from frontend to snake_case for AI Service (Python)
      */
     @PostMapping("/recommendation/strategy")
     @Operation(summary = "Get AI test strategy recommendation",
@@ -227,7 +288,10 @@ public class AIController {
         long startTime = System.currentTimeMillis();
         log.info("[REQUEST] POST /api/v1/ai/recommendation/strategy\n{}", toJsonString(request));
 
-        Map<String, Object> result = aiServiceClient.getRecommendation(request);
+        // Convert camelCase to snake_case for AI Service (Python)
+        Map<String, Object> convertedRequest = convertToSnakeCase(request);
+
+        Map<String, Object> result = aiServiceClient.getRecommendation(convertedRequest);
 
         long elapsedTime = System.currentTimeMillis() - startTime;
         log.info("[RESPONSE] POST /api/v1/ai/recommendation/strategy - Time: {}ms\n{}",

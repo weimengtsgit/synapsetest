@@ -2,13 +2,12 @@ package com.synapsetest.testmanagement.service;
 
 import com.synapsetest.testmanagement.dto.TestTaskRequest;
 import com.synapsetest.testmanagement.dto.request.CreateTestTaskRequest;
-
-import java.util.HashMap;
-import java.util.Map;
 import com.synapsetest.testmanagement.dto.response.TestTaskResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 /**
  * Test Recommendation Service
@@ -25,8 +24,6 @@ import org.springframework.stereotype.Service;
 public class TestRecommendationService {
 
     private final TestEnvironmentService environmentService;
-    private final TestVersionService versionService;
-    private final ResourcePoolService resourcePoolService;
 
     /**
      * Get intelligent test recommendations for a test task (CreateTestTaskRequest version)
@@ -195,7 +192,7 @@ public class TestRecommendationService {
      */
     private String recommendEnvironmentForCreate(CreateTestTaskRequest request) {
         Map<String, Object> codeChangeInfo = request.getCodeChangeInfo();
-        boolean isCritical = (Boolean) codeChangeInfo.getOrDefault("is_critical_module", false);
+        boolean isCritical = convertToBoolean(codeChangeInfo.getOrDefault("is_critical_module", false));
 
         if (isCritical) {
             return "TEST"; // Critical modules should be tested in TEST environment
@@ -210,10 +207,11 @@ public class TestRecommendationService {
     private String recommendScopeBasedOnCodeChange(CreateTestTaskRequest request) {
         Map<String, Object> codeChangeInfo = request.getCodeChangeInfo();
 
-        int changedFilesCount = (Integer) codeChangeInfo.getOrDefault("changed_files_count", 0);
-        int changedLinesCount = (Integer) codeChangeInfo.getOrDefault("changed_lines_count", 0);
-        boolean isHotfix = (Boolean) codeChangeInfo.getOrDefault("is_hotfix", false);
-        boolean isCriticalModule = (Boolean) codeChangeInfo.getOrDefault("is_critical_module", false);
+        // Safe type conversion - handle both String and Integer
+        int changedFilesCount = convertToInt(codeChangeInfo.getOrDefault("changed_files_count", 0));
+        int changedLinesCount = convertToInt(codeChangeInfo.getOrDefault("changed_lines_count", 0));
+        boolean isHotfix = convertToBoolean(codeChangeInfo.getOrDefault("is_hotfix", false));
+        boolean isCriticalModule = convertToBoolean(codeChangeInfo.getOrDefault("is_critical_module", false));
 
         // Decision logic based on code changes
         if (isHotfix) {
@@ -271,8 +269,8 @@ public class TestRecommendationService {
     private String generateReasoningForCreate(CreateTestTaskRequest request, String recommendedEnvironment,
                                               String recommendedVersion, String recommendedScope) {
         Map<String, Object> codeChangeInfo = request.getCodeChangeInfo();
-        int changedFilesCount = (Integer) codeChangeInfo.getOrDefault("changed_files_count", 0);
-        int changedLinesCount = (Integer) codeChangeInfo.getOrDefault("changed_lines_count", 0);
+        int changedFilesCount = convertToInt(codeChangeInfo.getOrDefault("changed_files_count", 0));
+        int changedLinesCount = convertToInt(codeChangeInfo.getOrDefault("changed_lines_count", 0));
 
         StringBuilder reasoning = new StringBuilder();
         reasoning.append("AI Analysis based on code changes:\n");
@@ -282,5 +280,47 @@ public class TestRecommendationService {
         reasoning.append(String.format("- Environment: %s\n", recommendedEnvironment));
 
         return reasoning.toString();
+    }
+    
+    /**
+     * Safely convert Object to int (handles both Integer and String)
+     */
+    private int convertToInt(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Integer) {
+            return (Integer) value;
+        }
+        if (value instanceof String) {
+            try {
+                return Integer.parseInt((String) value);
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse integer from string: {}", value);
+                return 0;
+            }
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        log.warn("Unexpected type for integer conversion: {}", value.getClass().getName());
+        return 0;
+    }
+    
+    /**
+     * Safely convert Object to boolean (handles both Boolean and String)
+     */
+    private boolean convertToBoolean(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof String) {
+            return Boolean.parseBoolean((String) value);
+        }
+        log.warn("Unexpected type for boolean conversion: {}", value.getClass().getName());
+        return false;
     }
 }

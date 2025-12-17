@@ -69,3 +69,6 @@ else               → 'P3'  // 0-3
 - 详细修复文档：`PRIORITY_DISPLAY_FIX.md`
 - 工具函数：`/frontend/src/utils/priorityUtils.ts`
 - 单元测试：`/frontend/src/utils/__tests__/priorityUtils.test.ts`
+
+
+

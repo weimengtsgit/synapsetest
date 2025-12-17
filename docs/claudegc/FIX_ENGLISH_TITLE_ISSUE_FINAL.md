@@ -187,3 +187,6 @@ tail -100 logs/ai-service.log | grep "跳过包含英文"
 **修复人**: Claude AI Assistant  
 **优先级**: P1（用户体验相关）
 **状态**: ✅ 已完成并生效
+
+
+

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.synapsetest.testmanagement.mapper.TaskTestCaseMapper">
+
+    <!-- Batch insert task-testcase associations -->
+    <insert id="batchInsert">
+        INSERT INTO task_test_cases (task_id, test_case_id, execution_order)
+        VALUES
+        <foreach collection="associations" item="item" separator=",">
+            (#{item.taskId}, #{item.testCaseId}, #{item.executionOrder})
+        </foreach>
+    </insert>
+    
+    <!-- Select test case IDs by task ID -->
+    <select id="selectTestCaseIdsByTaskId" resultType="String">
+        SELECT test_case_id 
+        FROM task_test_cases 
+        WHERE task_id = #{taskId}
+        ORDER BY execution_order
+    </select>
+    
+    <!-- Select test cases with details by task ID -->
+    <select id="selectTestCasesByTaskId" resultMap="com.synapsetest.testmanagement.mapper.TestCaseMapper.TestCaseResultMap">
+        SELECT 
+            tc.id,
+            tc.case_number,
+            tc.title,
+            tc.description,
+            tc.steps,
+            tc.expected_result,
+            tc.priority,
+            tc.type,
+            tc.status,
+            tc.tags,
+            tc.related_requirement,
+            tc.module,
+            tc.preconditions,
+            tc.quality_score,
+            tc.ai_generated,
+            tc.ai_confidence,
+            tc.created_at,
+            tc.updated_at,
+            tc.created_by,
+            ttc.execution_order
+        FROM test_cases tc
+        INNER JOIN task_test_cases ttc ON tc.id = ttc.test_case_id
+        WHERE ttc.task_id = #{taskId}
+        ORDER BY ttc.execution_order, tc.priority DESC
+    </select>
+    
+    <!-- Delete associations by task ID -->
+    <delete id="deleteByTaskId">
+        DELETE FROM task_test_cases 
+        WHERE task_id = #{taskId}
+    </delete>
+    
+    <!-- Update execution order -->
+    <update id="updateExecutionOrder">
+        UPDATE task_test_cases 
+        SET execution_order = #{executionOrder}
+        WHERE task_id = #{taskId} 
+        AND test_case_id = #{testCaseId}
+    </update>
+    
+    <!-- Count test cases by task ID -->
+    <select id="countByTaskId" resultType="int">
+        SELECT COUNT(*) 
+        FROM task_test_cases 
+        WHERE task_id = #{taskId}
+    </select>
+
+</mapper>

@@ -132,11 +132,29 @@ CREATE TABLE resource_pools (
     CONSTRAINT chk_allocated_capacity CHECK (allocated <= capacity)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='资源池表';
 
+-- 6. 任务-测试用例关联表
+DROP TABLE IF EXISTS task_test_cases;
+CREATE TABLE task_test_cases (
+    task_id CHAR(36) NOT NULL COMMENT '任务ID',
+    test_case_id CHAR(36) NOT NULL COMMENT '测试用例ID',
+    execution_order INTEGER COMMENT '执行顺序',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    
+    PRIMARY KEY (task_id, test_case_id),
+    
+    INDEX idx_task_id (task_id),
+    INDEX idx_test_case_id (test_case_id),
+    INDEX idx_execution_order (execution_order),
+    
+    FOREIGN KEY (task_id) REFERENCES test_tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='任务-测试用例关联表';
+
 -- ============================================
 -- AI相关表 (Backend + AI-Service合并)
 -- ============================================
 
--- 6. AI模型表
+-- 7. AI模型表
 DROP TABLE IF EXISTS ai_models;
 CREATE TABLE ai_models (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '模型ID',
@@ -157,7 +175,7 @@ CREATE TABLE ai_models (
     INDEX idx_compliance_status (compliance_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型表';
 
--- 7. 测试用例生成历史表 (AI-Service)
+-- 8. 测试用例生成历史表 (AI-Service)
 DROP TABLE IF EXISTS testcase_generation_history;
 CREATE TABLE testcase_generation_history (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '记录ID',
@@ -181,7 +199,7 @@ CREATE TABLE testcase_generation_history (
     INDEX idx_success (success)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='测试用例生成历史';
 
--- 8. 策略推荐历史表 (AI-Service)
+-- 9. 策略推荐历史表 (AI-Service)
 DROP TABLE IF EXISTS recommendation_history;
 CREATE TABLE recommendation_history (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '记录ID',
@@ -202,7 +220,7 @@ CREATE TABLE recommendation_history (
     FOREIGN KEY (version_id) REFERENCES test_versions(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='策略推荐历史';
 
--- 9. 用户反馈表 (AI-Service)
+-- 10. 用户反馈表 (AI-Service)
 DROP TABLE IF EXISTS user_feedback;
 CREATE TABLE user_feedback (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '反馈ID',
@@ -224,7 +242,7 @@ CREATE TABLE user_feedback (
     FOREIGN KEY (request_id) REFERENCES testcase_generation_history(request_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户反馈表';
 
--- 10. 公司标准表 (AI-Service)
+-- 11. 公司标准表 (AI-Service)
 DROP TABLE IF EXISTS company_standards;
 CREATE TABLE company_standards (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '标准ID',
@@ -246,7 +264,7 @@ CREATE TABLE company_standards (
 -- 监控和报告表 (Backend原有)
 -- ============================================
 
--- 11. 监控数据表
+-- 12. 监控数据表
 DROP TABLE IF EXISTS monitoring_data;
 CREATE TABLE monitoring_data (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '监控数据ID',
@@ -276,7 +294,7 @@ CREATE TABLE monitoring_data (
     FOREIGN KEY (task_id) REFERENCES test_tasks(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='监控数据表';
 
--- 12. 质量报告表
+-- 13. 质量报告表
 DROP TABLE IF EXISTS quality_reports;
 CREATE TABLE quality_reports (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '报告ID',
@@ -299,7 +317,7 @@ CREATE TABLE quality_reports (
     FOREIGN KEY (task_id) REFERENCES test_tasks(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='质量报告表';
 
--- 13. 质量报告测试结果表
+-- 14. 质量报告测试结果表
 DROP TABLE IF EXISTS quality_report_test_results;
 CREATE TABLE quality_report_test_results (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
@@ -320,7 +338,7 @@ CREATE TABLE quality_report_test_results (
     FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='质量报告测试结果表';
 
--- 14. 质量报告风险评估表
+-- 15. 质量报告风险评估表
 DROP TABLE IF EXISTS quality_report_risk_assessments;
 CREATE TABLE quality_report_risk_assessments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',

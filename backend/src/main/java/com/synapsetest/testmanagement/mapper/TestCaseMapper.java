@@ -42,5 +42,38 @@ public interface TestCaseMapper {
      * @return The maximum case_number with that prefix, or null if none exists
      */
     String findMaxCaseNumberByPrefix(String prefix);
+    
+    /**
+     * Select test cases by module
+     * 
+     * @param module Module name
+     * @return List of test cases in the module
+     */
+    List<TestCase> selectByModule(String module);
+    
+    /**
+     * Select test cases by module and status
+     * 
+     * @param module Module name
+     * @param status Test case status (e.g., "APPROVED")
+     * @return List of test cases matching criteria
+     */
+    List<TestCase> selectByModuleAndStatus(String module, String status);
+    
+    /**
+     * Select test cases by module with minimum priority
+     * 
+     * @param module Module name
+     * @param minPriority Minimum priority level
+     * @return List of test cases matching criteria
+     */
+    List<TestCase> selectByModuleAndPriority(String module, Integer minPriority);
+    
+    /**
+     * Select all distinct modules
+     * 
+     * @return List of distinct module names
+     */
+    List<String> selectDistinctModules();
 }
 
