@@ -115,4 +115,12 @@ coverage/
 temp/
 tmp/
 
+# Media files (large videos, etc.)
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+
 volumes/
