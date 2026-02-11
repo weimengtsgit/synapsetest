@@ -8,6 +8,7 @@ import {
   BulbOutlined,
   BarChartOutlined,
   CheckCircleOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons';
 import { Line } from '@ant-design/plots';
 import { useNavigate } from 'react-router-dom';
@@ -30,9 +31,11 @@ const WorkbenchDashboard: React.FC = () => {
     runningTasks: 0,
     overallPassRate: 0,
     aiAccuracy: 0,
+    pendingRequirements: 0,
   });
 
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [recentRequirements, setRecentRequirements] = useState<any[]>([]);
   const [trendData, setTrendData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,6 +59,7 @@ const WorkbenchDashboard: React.FC = () => {
         runningTasks: 8,
         overallPassRate: 92.5,
         aiAccuracy: 88.3,
+        pendingRequirements: 12,
       });
 
       // Load recent tasks
@@ -102,6 +106,45 @@ const WorkbenchDashboard: React.FC = () => {
         },
       ]);
 
+      // Load recent requirements
+      setRecentRequirements([
+        {
+          id: 'REQ-001',
+          title: '用户登录功能',
+          status: 'APPROVED',
+          priority: 'P0',
+          updatedAt: '2025-02-11 10:30',
+        },
+        {
+          id: 'REQ-002',
+          title: '订单管理功能',
+          status: 'APPROVED',
+          priority: 'P0',
+          updatedAt: '2025-02-11 09:15',
+        },
+        {
+          id: 'REQ-003',
+          title: '支付集成功能',
+          status: 'DRAFT',
+          priority: 'P1',
+          updatedAt: '2025-02-10 16:45',
+        },
+        {
+          id: 'REQ-004',
+          title: '系统性能优化',
+          status: 'DRAFT',
+          priority: 'P1',
+          updatedAt: '2025-02-10 14:20',
+        },
+        {
+          id: 'REQ-005',
+          title: '数据安全加固',
+          status: 'APPROVED',
+          priority: 'P0',
+          updatedAt: '2025-02-10 11:00',
+        },
+      ]);
+
       // Generate trend data for the past 7 days
       setTrendData(generateTrendData());
 
@@ -137,6 +180,13 @@ const WorkbenchDashboard: React.FC = () => {
   };
 
   const quickActions = [
+    {
+      title: '需求分析',
+      icon: <FileSearchOutlined style={{ fontSize: 32, color: '#eb2f96' }} />,
+      description: 'AI智能需求分析',
+      path: '/requirements/ai-analysis',
+      color: '#fff0f6',
+    },
     {
       title: '生成测试用例',
       icon: <FileTextOutlined style={{ fontSize: 32, color: '#1890ff' }} />,
@@ -218,6 +268,38 @@ const WorkbenchDashboard: React.FC = () => {
     return statusMap[status] || status;
   };
 
+  const getRequirementStatusColor = (status: string) => {
+    switch (status) {
+      case 'APPROVED':
+        return '#52c41a';
+      case 'DRAFT':
+        return '#faad14';
+      case 'REJECTED':
+        return '#ff4d4f';
+      default:
+        return '#d9d9d9';
+    }
+  };
+
+  const getRequirementStatusText = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'DRAFT': '草稿',
+      'APPROVED': '已批准',
+      'REJECTED': '已拒绝',
+    };
+    return statusMap[status] || status;
+  };
+
+  const getPriorityColor = (priority: string) => {
+    const colors: Record<string, string> = {
+      'P0': '#ff4d4f',
+      'P1': '#faad14',
+      'P2': '#1890ff',
+      'P3': '#d9d9d9',
+    };
+    return colors[priority] || '#d9d9d9';
+  };
+
   return (
     <div style={{ padding: '24px' }}>
       <h2 style={{ marginBottom: 24 }}>工作台</h2>
@@ -225,7 +307,7 @@ const WorkbenchDashboard: React.FC = () => {
       {/* Quick Actions */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {quickActions.map((action, index) => (
-          <Col xs={24} sm={12} md={6} key={index}>
+          <Col xs={24} sm={12} md={8} lg={24 / 5} key={index}>
             <Card
               hoverable
               onClick={() => navigate(action.path)}
@@ -251,7 +333,22 @@ const WorkbenchDashboard: React.FC = () => {
 
       {/* Today's Statistics */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={6} lg={4}>
+          <Card loading={loading}>
+            <Statistic
+              title="待分析需求"
+              value={stats.pendingRequirements}
+              suffix="个"
+              valueStyle={{ color: '#eb2f96' }}
+              prefix={<FileSearchOutlined />}
+            />
+            <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
+              较昨日 <span style={{ color: '#3f8600' }}>↑ 5%</span>
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} md={6} lg={4}>
           <Card loading={loading}>
             <Statistic
               title="生成用例"
@@ -266,7 +363,7 @@ const WorkbenchDashboard: React.FC = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={6} lg={4}>
           <Card loading={loading}>
             <Statistic
               title="执行中任务"
@@ -280,7 +377,7 @@ const WorkbenchDashboard: React.FC = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={6} lg={4}>
           <Card loading={loading}>
             <Statistic
               title="整体通过率"
@@ -295,7 +392,7 @@ const WorkbenchDashboard: React.FC = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={6} lg={4}>
           <Card loading={loading}>
             <Statistic
               title="AI准确率"
@@ -372,8 +469,76 @@ const WorkbenchDashboard: React.FC = () => {
           </Card>
         </Col>
 
-        {/* Efficiency Trend */}
+        {/* Recent Requirements */}
         <Col xs={24} lg={12}>
+          <Card
+            title="最近需求"
+            extra={
+              <Button type="link" onClick={() => navigate('/requirements/list')}>
+                查看全部
+              </Button>
+            }
+            loading={loading}
+          >
+            <List
+              dataSource={recentRequirements}
+              renderItem={(item: any) => (
+                <List.Item
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => navigate('/requirements/list')}
+                >
+                  <List.Item.Meta
+                    avatar={
+                      <FileSearchOutlined
+                        style={{
+                          fontSize: 24,
+                          color: getRequirementStatusColor(item.status)
+                        }}
+                      />
+                    }
+                    title={
+                      <Space>
+                        <span>{item.title}</span>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: getPriorityColor(item.priority),
+                            backgroundColor: `${getPriorityColor(item.priority)}20`,
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          {item.priority}
+                        </span>
+                      </Space>
+                    }
+                    description={
+                      <Space>
+                        <span>{item.id}</span>
+                        <span>•</span>
+                        <span
+                          style={{
+                            color: getRequirementStatusColor(item.status),
+                          }}
+                        >
+                          {getRequirementStatusText(item.status)}
+                        </span>
+                      </Space>
+                    }
+                  />
+                  <div style={{ fontSize: 12, color: '#888' }}>
+                    {item.updatedAt}
+                  </div>
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        {/* Efficiency Trend */}
+        <Col xs={24}>
           <Card title="效能趋势" loading={loading}>
             <Line {...trendConfig} />
           </Card>

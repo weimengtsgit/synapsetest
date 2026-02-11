@@ -1,0 +1,17 @@
+.requirement-list-container {
+  padding: 24px;
+  background: #f0f2f5;
+  min-height: calc(100vh - 64px);
+}
+
+.requirement-list-container .ant-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.requirement-list-container .ant-table {
+  background: white;
+}
+
+.requirement-list-container .ant-tag {
+  margin: 2px;
+}

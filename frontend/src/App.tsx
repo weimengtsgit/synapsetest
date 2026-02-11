@@ -10,6 +10,7 @@ import {
   SettingOutlined,
   ThunderboltOutlined,
   BarChartOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons'
 import './App.css'
 
@@ -33,6 +34,8 @@ import SmartGenerate from './components/test-case/SmartGenerate'
 import GenerationHistory from './components/test-case/GenerationHistory'
 import TestCaseOptimization from './components/test-case/TestCaseOptimization'
 import ExecutionTracking from './components/test-case/ExecutionTracking'
+import RequirementList from './components/requirement/RequirementList'
+import AIRequirementAnalysis from './components/requirement/AIRequirementAnalysis'
 
 const { Header, Content, Footer, Sider } = Layout
 
@@ -46,6 +49,21 @@ const App: React.FC = () => {
       key: '/',
       icon: <HomeOutlined />,
       label: <Link to="/">工作台 (Workbench)</Link>,
+    },
+    {
+      key: 'requirements',
+      icon: <FileSearchOutlined />,
+      label: '需求管理 (Requirement)',
+      children: [
+        {
+          key: '/requirements/list',
+          label: <Link to="/requirements/list">需求列表 (List)</Link>,
+        },
+        {
+          key: '/requirements/ai-analysis',
+          label: <Link to="/requirements/ai-analysis">AI 需求分析 (AI Analysis)</Link>,
+        },
+      ],
     },
     {
       key: 'test-cases',
@@ -168,6 +186,10 @@ const App: React.FC = () => {
             <Routes>
               {/* Workbench Dashboard as Home */}
               <Route path="/" element={<WorkbenchDashboard />} />
+
+              {/* Requirements */}
+              <Route path="/requirements/list" element={<RequirementList />} />
+              <Route path="/requirements/ai-analysis" element={<AIRequirementAnalysis />} />
 
               {/* Test Cases */}
               <Route path="/test-cases/smart-generate" element={<SmartGenerate />} />
