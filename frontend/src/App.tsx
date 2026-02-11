@@ -153,10 +153,10 @@ const App: React.FC = () => {
           collapsible
           collapsed={collapsed}
           onCollapse={(value) => setCollapsed(value)}
-          theme="dark"
+          theme="light"
         >
           <Menu
-            theme="dark"
+            theme="light"
             mode="inline"
             defaultSelectedKeys={['/']}
             items={menuItems}

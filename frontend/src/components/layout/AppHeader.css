@@ -12,6 +12,12 @@
   right: 0;
   z-index: 1000;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display:none;
+
+}
+
+.ant-layout {
+  margin-top: 0 !important;
 }
 
 .app-header-logo {
